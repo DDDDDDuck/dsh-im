@@ -6,6 +6,11 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- WhatsApp 群聊仅在被 @ 或回复机器人实际发出的消息时触发，绑定账号本人的普通发言及对其手动消息的回复不再唤醒机器人；自聊保持正常。机器人群消息 ID 随现有状态保存，重启后仍可识别。
+  WhatsApp groups now respond only to mentions or replies to messages actually sent by the bot. Ordinary messages from the linked account and replies to its manual messages no longer trigger the bot; self-chat is unchanged. Bot group-message IDs are persisted across restarts.
+
 ## [5.0.2] - 2026-10-18
 
 ### Fixed / 修复
