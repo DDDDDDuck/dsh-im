@@ -6,6 +6,18 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-10-18
+
+### Fixed / 修复
+
+- 更新管理页面的 DSH 版本兼容说明：明确 dsh-im `4.39.0` 对应 DSH `0.2.0-rc.2`、dsh-im `5.0.0` 对应 DSH `0.2.1-rc.2`，保留 `4.25.0` 的旧版提示，移除过时的 `4.26.0` / `4.27.0` 提示；同步英文翻译与客户端构建产物。
+  Updated the management page's DSH compatibility notes to identify dsh-im `4.39.0` with DSH `0.2.0-rc.2` and dsh-im `5.0.0` with DSH `0.2.1-rc.2`. The legacy `4.25.0` note is retained, obsolete `4.26.0` / `4.27.0` guidance is removed, and English translations and the client bundle are synchronized.
+
+### Notes / 使用说明
+
+- 本次为兼容提示文案修正版，不改变渠道运行逻辑、依赖或包内兼容声明。升级后重启 Host 并刷新管理页面，以加载新版客户端提示。
+  This patch updates compatibility guidance only; channel runtime behavior, dependencies, and package compatibility declarations remain unchanged. Restart the Host and refresh the management page after upgrading to load the updated client guidance.
+
 ## [5.0.0] - 2026-10-18
 
 ### Added / 新增
@@ -1801,7 +1813,8 @@ Thanks to [@Dong09](https://github.com/Dong09) for the Matrix conversation-conte
 - 改进 npm 发布包结构，保留 CLI 入口并避免安装脚本拦截。
   Improved npm package contents to preserve the CLI entry point and avoid install-script blocking.
 
-[Unreleased]: https://github.com/xmanrui/dsh-im/compare/v5.0.0...HEAD
+[Unreleased]: https://github.com/xmanrui/dsh-im/compare/v5.0.1...HEAD
+[5.0.1]: https://github.com/xmanrui/dsh-im/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/xmanrui/dsh-im/compare/v4.39.0...v5.0.0
 [4.39.0]: https://github.com/xmanrui/dsh-im/compare/v4.38.2...v4.39.0
 [4.38.2]: https://github.com/xmanrui/dsh-im/compare/v4.38.1...v4.38.2
