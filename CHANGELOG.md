@@ -6,6 +6,8 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+## [5.0.2] - 2026-10-18
+
 ### Fixed / 修复
 
 - 修复 DSH `0.2.1-rc.2` 下 `/session` 绑定已有会话失败并额外创建空白会话的问题。现代 Host 的绑定路径改为读取指定会话并核对工作区，不再通过 `session.create` 恢复；保留原 Session ID、历史、权限、模型和 Agent Preset，以及归档状态。
@@ -19,6 +21,8 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 - DSH `0.2.1-rc.2` 未注册 `/clear`。本次补齐其请求身份后，会明确提示 Host 不支持并保留当前会话；不会清空上下文或改为新建会话。飞书和企业微信已实测 `/compact`、`/permission workspace-write` 成功，以及 `/clear` 的未支持提示。
   DSH `0.2.1-rc.2` does not register `/clear`. With its caller identity supplied, the bot explicitly reports the unsupported command and preserves the Session; it does not clear context or create a replacement Session. Live Feishu and Enterprise WeChat tests verified successful `/compact` and `/permission workspace-write` execution, plus the unsupported `/clear` response.
+- 依赖声明与包内 DSH 兼容声明保持不变。升级后重启 Host 并刷新管理页面，以加载同版 Host 和客户端代码。
+  Dependency and DSH compatibility declarations remain unchanged. Restart the Host and refresh the management page after upgrading so Host and client code use the same version.
 
 ## [5.0.1] - 2026-10-18
 
@@ -1827,7 +1831,8 @@ Thanks to [@Dong09](https://github.com/Dong09) for the Matrix conversation-conte
 - 改进 npm 发布包结构，保留 CLI 入口并避免安装脚本拦截。
   Improved npm package contents to preserve the CLI entry point and avoid install-script blocking.
 
-[Unreleased]: https://github.com/xmanrui/dsh-im/compare/v5.0.1...HEAD
+[Unreleased]: https://github.com/xmanrui/dsh-im/compare/v5.0.2...HEAD
+[5.0.2]: https://github.com/xmanrui/dsh-im/compare/v5.0.1...v5.0.2
 [5.0.1]: https://github.com/xmanrui/dsh-im/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/xmanrui/dsh-im/compare/v4.39.0...v5.0.0
 [4.39.0]: https://github.com/xmanrui/dsh-im/compare/v4.38.2...v4.39.0
