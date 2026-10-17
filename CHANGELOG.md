@@ -6,6 +6,13 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- 修复旧会话引用已移除模型时，WhatsApp、Discord 等渠道停在「正在处理」并让后续消息等待超时的问题。共享回复追踪从持久化消息队列的取出记录确认早期失败归属，及时提示模型不可用并释放聊天队列；已留下的超时补发记录也能识别这类失败并结束等待。
+  Fixed WhatsApp, Discord, and other channels waiting for a timeout when an existing session references a removed model. Shared reply tracking now correlates early failures through durable inbox claims, reports the model error promptly, and releases the conversation queue. Deferred deliveries can also resolve these failures without waiting indefinitely.
+- 修复 DSH `0.2.1-rc.2` 下所有渠道因网关请求缺少 `peer` 而在提交消息前失败的问题。共享适配层复用 Host Connection 创建的调用方身份，用于普通调用和流式调用，并在插件卸载时释放；补充全部渠道的回归测试，微信和 QQ 新会话、已有会话已完成真机收发验证。
+  Fixed pre-submission failures across all channels on DSH `0.2.1-rc.2` caused by Gateway requests missing `peer`. The shared adapter reuses a Host Connection peer for unary and streaming calls and disposes it on unload. Regression coverage includes every channel; live WeChat and QQ tests verified replies in new and existing sessions.
+
 ## [4.39.0] - 2026-10-13
 
 本版本的 Matrix 会话上下文与群聊追问能力来自 [@Dong09](https://github.com/Dong09) 的贡献（[#350](https://github.com/xmanrui/dsh-im/pull/350)），感谢！

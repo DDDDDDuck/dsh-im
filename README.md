@@ -129,7 +129,7 @@ dsh plugin --profile web add -w @xmanrui/dsh-im
 
 重启 `dsh web`、刷新浏览器，然后打开「设置 → IM机器人」。IM机器人使用 `order: 21`，尽量排在一级设置菜单的「Agent 预设」之后；插件页面不再保留旧入口。从旧版升级不会改变已有机器人、凭据、工作区、Agent Preset 或会话绑定。
 
-本机 `dsh web` 和 DSH Desktop 默认直接复用当前 Host 的内部服务：旧版 Harness 使用 `apiProxy`，新版 Harness 自动使用 Typert Gateway、Session Controller 和 Workspace Controller，不需要配置 Harness 地址，也不绕行本机 HTTP 端口。Desktop 的兼容模式、扩展窗口和增强模式均无需开启“允许在浏览器中打开”或局域网访问。渠道配置中显式设置的 `harnessBaseUrl` 仅保留给旧版远程 HTTP/WebSocket Harness；内部调用失败不会自动改连其他 Host。
+本机 `dsh web` 和 DSH Desktop 默认直接复用当前 Host 的内部服务：通过 Typert Gateway 调用 Session Controller 和 Workspace Controller，不需要配置 Harness 地址，也不绕行本机 HTTP 端口。Desktop 的兼容模式、扩展窗口和增强模式均无需开启“允许在浏览器中打开”或局域网访问。渠道配置中显式设置的 `harnessBaseUrl` 仅保留给旧版远程 HTTP/WebSocket Harness；内部调用失败不会自动改连其他 Host。
 
 如需试用尚未发布到 npm 的最新代码，可以改用 GitHub 源安装器：
 
@@ -285,7 +285,9 @@ Web 与机器人可同时处理同一审批，先提交的「批准一次」或�
 
 ## 本地开发
 
-最新版 dsh-im 跟随最新版 DSH，本次支持基线为 DSH `0.2.0-rc.2`（Session 格式 v4）。后续功能和修复不再增加旧版 DSH 的兼容分支，已有其他兼容逻辑暂时保留；旧宿主请使用对应的历史插件版本。`package.json` 只声明当前实际验证的宿主版本，不承诺未经验证的未来版本。升级插件后重启 Host 并刷新设置页，使 Host 和客户端使用同一版插件。
+最新版 dsh-im 跟随最新版 DSH，本次支持基线为 DSH `0.2.1-rc.2`（Session 格式 v4）。后续功能和修复不再增加旧版 DSH 的兼容分支，已有其他兼容逻辑暂时保留；旧宿主请使用对应的历史插件版本。`package.json` 只声明当前实际验证的宿主版本，不承诺未经验证的未来版本。升级插件后重启 Host 并刷新设置页，使 Host 和客户端使用同一版插件。
+
+DSH `0.2.1-rc.2` 要求内部网关请求携带调用方 `peer`。所有渠道共用的适配层通过 Host Connection 创建并复用该身份，同时用于普通调用和流式调用，在插件卸载时释放。微信和 QQ 的新会话、已有会话收发已完成真机验证。
 
 上下文增强中的来源信息、引导词和引用回复使用 v4 的 `plugin:dsh-im` 来源字段，修复了它们触发的 `SessionFormatError: format v4 message requires a producer-owned source kind`。消息顺序、用户正文和会话级引导词去重沿用原有机制，历史会话由宿主负责迁移。
 

@@ -126,7 +126,7 @@ dsh plugin --profile web add -w @xmanrui/dsh-im
 
 Restart `dsh web`, refresh the browser, then open **Settings → IM Bot**. The top-level IM Bot entry uses `order: 21` to follow **Agent Presets**, and the Plugins page no longer retains the old entry. Upgrading preserves existing bots, credentials, workspaces, Agent Presets, and Session bindings.
 
-Local `dsh web` and DSH Desktop reuse the current Host's internal services by default: legacy Harness releases use `apiProxy`, while current releases automatically use the Typert Gateway plus the Session and Workspace controllers. No Harness address or loopback HTTP connection is required. Desktop's compatibility, extended-window, and advanced modes do not require browser access or LAN access to be enabled. An explicit channel `harnessBaseUrl` is retained only for legacy remote HTTP/WebSocket Harness endpoints; failed internal calls never silently switch to another Host.
+Local `dsh web` and DSH Desktop reuse the current Host's internal services by default: the Typert Gateway invokes the Session and Workspace controllers. No Harness address or loopback HTTP connection is required. Desktop's compatibility, extended-window, and advanced modes do not require browser access or LAN access to be enabled. An explicit channel `harnessBaseUrl` is retained only for legacy remote HTTP/WebSocket Harness endpoints; failed internal calls never silently switch to another Host.
 
 To try the latest code before it is published to npm, use the GitHub-source installer instead:
 
@@ -282,7 +282,9 @@ Startup configuration validation failures also include `file`, `field`, and `iss
 
 ## Local development
 
-The latest dsh-im follows the latest DSH, with DSH `0.2.0-rc.2` (Session format V4) as this update's supported baseline. New features and fixes do not add compatibility branches for older DSH versions; existing unrelated compatibility code remains in place. Older hosts should use the corresponding historical plugin release. `package.json` declares only the host versions actually verified for this build, without promising support for untested future releases. After upgrading the plugin, restart the Host and refresh the settings page so both sides use the same plugin build.
+The latest dsh-im follows the latest DSH, with DSH `0.2.1-rc.2` (Session format V4) as this update's supported baseline. New features and fixes do not add compatibility branches for older DSH versions; existing unrelated compatibility code remains in place. Older hosts should use the corresponding historical plugin release. `package.json` declares only the host versions actually verified for this build, without promising support for untested future releases. After upgrading the plugin, restart the Host and refresh the settings page so both sides use the same plugin build.
+
+DSH `0.2.1-rc.2` requires an explicit caller `peer` on internal Gateway requests. The shared adapter creates it through Host Connection, reuses it for unary and streaming calls across all channels, and disposes it when the plugin unloads. Live WeChat and QQ tests verified replies in both new and existing sessions.
 
 Source details, guidance, and quoted replies now use the V4 `plugin:dsh-im` source kind, fixing `SessionFormatError: format v4 message requires a producer-owned source kind`. Message ordering, user text, and session-level guidance deduplication retain their existing behavior. The host owns historical Session migration.
 

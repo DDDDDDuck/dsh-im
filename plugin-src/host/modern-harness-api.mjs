@@ -37,12 +37,13 @@ function rpcResult(request, operation) {
   );
 }
 
-function remoteRequest(namespace, method, args, signal) {
+function remoteRequest(namespace, method, args, signal, peer) {
   return {
     namespace,
     method,
     args,
     ...(signal === undefined ? {} : { signal }),
+    ...(peer === undefined ? {} : { peer }),
   };
 }
 
@@ -196,6 +197,7 @@ class MuxSubscription {
 
 class ModernHarnessApi {
   #gateway;
+  #peer;
   #deliveryService;
   #scope;
   #mux = new Set();
@@ -209,6 +211,9 @@ class ModernHarnessApi {
   constructor(ctx, gateway, scope) {
     this.#gateway = gateway;
     this.#scope = scope;
+    // New Hosts require an explicit caller. IM interactions use the adapter's
+    // existing event listeners; this peer only owns Gateway calls and streams.
+    this.#peer = ctx.connection?.createPeer?.({ principal: { kind: 'owner' }, interactions: 'none' });
 
     this.host = Object.freeze({
       describe: (request) => rpcResult(request, () => ({ ready: true, transport: 'typert' })),
@@ -292,7 +297,7 @@ class ModernHarnessApi {
   }
 
   async #invoke(namespace, method, args, signal) {
-    return this.#gateway.invoke(remoteRequest(namespace, method, args, signal));
+    return this.#gateway.invoke(remoteRequest(namespace, method, args, signal, this.#peer));
   }
 
   async #streamFirst(namespace, method, args, signal) {
@@ -303,7 +308,7 @@ class ModernHarnessApi {
     let iterator;
     try {
       const source = await this.#gateway.stream(remoteRequest(
-        namespace, method, args, streamSignal,
+        namespace, method, args, streamSignal, this.#peer,
       ));
       iterator = source[Symbol.asyncIterator]();
       const first = await iterator.next();
@@ -866,6 +871,7 @@ class ModernHarnessApi {
       questionError('dsh-im interaction adapter was disposed', 'ASK_ABORTED'),
     );
     for (const dispose of this.#disposers.splice(0).reverse()) dispose?.();
+    return this.#peer?.dispose();
   }
 }
 
@@ -890,7 +896,7 @@ export function modernHarnessApi(ctx, { deliveryService } = {}) {
   if (typeof ctx.effect === 'function') {
     ctx.effect(() => () => {
       if (modernApis.get(scope) === api) modernApis.delete(scope);
-      api.dispose();
+      return api.dispose();
     }, 'dsh-im: modern Harness compatibility API');
   }
   return api;
