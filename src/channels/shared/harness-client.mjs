@@ -1320,7 +1320,10 @@ export class HarnessClient {
   }
 
   async adoptWorkspaceSession(value, options = {}) {
-    return adoptRegisteredWorkspaceSession(this, value, options);
+    // Modern Hosts separate observing an existing Session from creating one.
+    // Keep the legacy transport contract for Hosts without this adapter seam.
+    const method = typeof this.#apiProxy?.sessions?.adopt === 'function' ? 'session.adopt' : 'session.create';
+    return adoptRegisteredWorkspaceSession(this, value, options, 30_000, method);
   }
 
   async isUngroupedWorkspace(workspace) {

@@ -8,6 +8,8 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ### Fixed / 修复
 
+- 修复 DSH `0.2.1-rc.2` 下 `/session` 绑定已有会话失败并额外创建空白会话的问题。现代 Host 的绑定路径改为读取指定会话并核对工作区，不再通过 `session.create` 恢复；保留原 Session ID、历史、权限、模型和 Agent Preset，以及归档状态。
+  Fixed `/session` failing to bind existing Sessions and creating unwanted blank Sessions on DSH `0.2.1-rc.2`. Modern Host adoption now reads the specified Session and validates its workspace instead of using `session.create`, preserving its identity, history, permissions, model, Agent Preset, and archive state.
 - 修复企业微信将 `/permission` 和 `/permissionlist` 当作普通消息提交给模型的问题；现接入共享权限命令处理，遵守机器人命令访问限制，并补齐帮助说明。
   Fixed Enterprise WeChat submitting `/permission` and `/permissionlist` as model prompts. They now use the shared permission command handler, enforce bot command access rules, and appear in help.
 - 补齐 DSH `0.2.1-rc.2` 下 `/compact`、`/clear`、`/permission` 命令请求的调用方 `peer`，与会话请求共用一个 Host 身份，参数适配重试也保留该身份，并在插件卸载时统一释放。感谢 [@2220545672](https://github.com/2220545672) 在 [#364](https://github.com/xmanrui/dsh-im/pull/364) 中的定位与验证，以及 [@spdw666](https://github.com/spdw666) 指出的命令路径遗漏。

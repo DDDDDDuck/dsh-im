@@ -23,7 +23,7 @@ const REASONS = new Set([
 ]);
 const RESOURCES = new Set(['credential-store', 'account-config', 'account-state', 'workspace-config', 'workspace-directory']);
 const RPC_METHODS = new Set([
-  'host.describe', 'workspace.list', 'workspace.create', 'session.list', 'session.create',
+  'host.describe', 'workspace.list', 'workspace.create', 'session.list', 'session.create', 'session.adopt',
   'session.history', 'session.prompt', 'session.rename', 'session.cancel', 'session.models',
   'session.permissions', 'session.selectModel', 'llm.models',
 ]);

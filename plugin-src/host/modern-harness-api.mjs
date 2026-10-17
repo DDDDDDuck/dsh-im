@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { activeHarnessInteractionOwner, clearModelCatalogCache, hasActiveHarnessInteractionOwner, harnessToolCallFromEvent, HarnessInteractionError } from '../../src/channels/shared/harness-client.mjs';
 import { extractConnectionEvidence } from '../../src/channels/shared/connection-error.mjs';
 import { harnessPeer } from './harness-peer.mjs';
+import { sameWorkspacePath } from '../../src/channels/shared/default-workspace.mjs';
 
 const modernApis = new WeakMap();
 
@@ -52,6 +53,12 @@ function questionError(message, code) {
   const error = new Error(message);
   error.name = 'UserQuestionError';
   error.code = code;
+  return error;
+}
+
+function adoptionError(code, message) {
+  const error = new Error(message);
+  error.failure = { code, message, details: {} };
   return error;
 }
 
@@ -230,6 +237,7 @@ class ModernHarnessApi {
       create: (request, signal) => rpcResult(request, () => this.#invoke(
         'session', 'create', { request: request.payload }, signal,
       )),
+      adopt: (request, signal) => rpcResult(request, () => this.#adoptSession(request.payload, signal)),
       history: (request, signal) => rpcResult(request, () => this.#history(request.payload, signal)),
       prompt: (request, signal) => rpcResult(request, () => this.#invoke(
         'session',
@@ -339,6 +347,33 @@ class ModernHarnessApi {
     }
     this.#rememberCursor(sessionId, frame.cursor);
     return frame;
+  }
+
+  async #adoptSession({ sessionId, workspaceId, cwd }, signal) {
+    // Since DSH 0.2.1, create only reuses blank Sessions and can replace their
+    // preset. Binding must observe the exact existing identity instead; the
+    // next prompt resumes its Agent with the persisted configuration.
+    const { header } = await this.#sessionSnapshot(sessionId, 1, signal);
+    if (header?.id !== sessionId || typeof header.cwd !== 'string') {
+      throw new Error('Harness returned an invalid Session header for adoption');
+    }
+    if (header.origin !== undefined) {
+      throw adoptionError('session-subagent-unsupported', 'Only ordinary Sessions can be adopted');
+    }
+    let expectedCwd = cwd;
+    if (workspaceId !== undefined) {
+      const baseline = await this.#workspaceList(signal);
+      const workspace = baseline.items?.find(item => item.workspaceId === workspaceId);
+      if (cwd !== undefined || !workspace?.sessionIds?.includes(sessionId)) {
+        throw adoptionError('session-workspace-ambiguous', 'Session workspace membership changed during adoption');
+      }
+      expectedCwd = workspace.path;
+    }
+    if (!await sameWorkspacePath(header.cwd, expectedCwd)) {
+      throw adoptionError('session-workspace-ambiguous', 'Session directory does not match its workspace');
+    }
+    signal?.throwIfAborted();
+    return { sessionId };
   }
 
   async #history(payload, signal) {
