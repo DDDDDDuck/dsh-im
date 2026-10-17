@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { activeHarnessInteractionOwner, clearModelCatalogCache, hasActiveHarnessInteractionOwner, harnessToolCallFromEvent, HarnessInteractionError } from '../../src/channels/shared/harness-client.mjs';
 import { extractConnectionEvidence } from '../../src/channels/shared/connection-error.mjs';
+import { harnessPeer } from './harness-peer.mjs';
 
 const modernApis = new WeakMap();
 
@@ -211,9 +212,7 @@ class ModernHarnessApi {
   constructor(ctx, gateway, scope) {
     this.#gateway = gateway;
     this.#scope = scope;
-    // New Hosts require an explicit caller. IM interactions use the adapter's
-    // existing event listeners; this peer only owns Gateway calls and streams.
-    this.#peer = ctx.connection?.createPeer?.({ principal: { kind: 'owner' }, interactions: 'none' });
+    this.#peer = harnessPeer(ctx);
 
     this.host = Object.freeze({
       describe: (request) => rpcResult(request, () => ({ ready: true, transport: 'typert' })),
@@ -871,7 +870,6 @@ class ModernHarnessApi {
       questionError('dsh-im interaction adapter was disposed', 'ASK_ABORTED'),
     );
     for (const dispose of this.#disposers.splice(0).reverse()) dispose?.();
-    return this.#peer?.dispose();
   }
 }
 

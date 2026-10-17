@@ -6,6 +6,18 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- 修复企业微信将 `/permission` 和 `/permissionlist` 当作普通消息提交给模型的问题；现接入共享权限命令处理，遵守机器人命令访问限制，并补齐帮助说明。
+  Fixed Enterprise WeChat submitting `/permission` and `/permissionlist` as model prompts. They now use the shared permission command handler, enforce bot command access rules, and appear in help.
+- 补齐 DSH `0.2.1-rc.2` 下 `/compact`、`/clear`、`/permission` 命令请求的调用方 `peer`，与会话请求共用一个 Host 身份，参数适配重试也保留该身份，并在插件卸载时统一释放。感谢 [@2220545672](https://github.com/2220545672) 在 [#364](https://github.com/xmanrui/dsh-im/pull/364) 中的定位与验证，以及 [@spdw666](https://github.com/spdw666) 指出的命令路径遗漏。
+  Added the missing caller `peer` to `/compact`, `/clear`, and `/permission` requests on DSH `0.2.1-rc.2`. Commands and session requests share one Host identity, preserve it during argument adaptation, and release it on plugin unload. Thanks to [@2220545672](https://github.com/2220545672) for the diagnosis and validation in [#364](https://github.com/xmanrui/dsh-im/pull/364), and [@spdw666](https://github.com/spdw666) for identifying the missing command path.
+
+### Notes / 使用说明
+
+- DSH `0.2.1-rc.2` 未注册 `/clear`。本次补齐其请求身份后，会明确提示 Host 不支持并保留当前会话；不会清空上下文或改为新建会话。飞书和企业微信已实测 `/compact`、`/permission workspace-write` 成功，以及 `/clear` 的未支持提示。
+  DSH `0.2.1-rc.2` does not register `/clear`. With its caller identity supplied, the bot explicitly reports the unsupported command and preserves the Session; it does not clear context or create a replacement Session. Live Feishu and Enterprise WeChat tests verified successful `/compact` and `/permission workspace-write` execution, plus the unsupported `/clear` response.
+
 ## [5.0.1] - 2026-10-18
 
 ### Fixed / 修复

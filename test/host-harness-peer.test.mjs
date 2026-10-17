@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import { harnessConnection } from '../plugin-src/host/harness-connection.mjs';
 import { modernHarnessApi } from '../plugin-src/host/modern-harness-api.mjs';
+import { createHarnessCommandExecutor } from '../plugin-src/host/harness-command-executor.mjs';
+import { runClearCommand } from '../src/channels/shared/clear-command.mjs';
 
 const clients = [
   ['weixin', 'HarnessClient'], ['qq', 'QqHarnessClient'], ['feishu', 'HarnessClient'],
@@ -35,6 +37,7 @@ function fixture() {
         switch (`${request.namespace}/${request.method}`) {
           case 'session/create': return { sessionId: 'session' };
           case 'session/modelCatalog': return { groups: [], failures: [] };
+          case 'commands/execute': return { result: { kind: 'success' } };
           default: throw new Error(`Unexpected endpoint ${request.namespace}/${request.method}`);
         }
       },
@@ -54,7 +57,9 @@ function fixture() {
     on() { return () => {}; },
     effect(setup) { effects.push(setup()); },
   };
-  return { ctx, peer, calls, created, effects, get disposals() { return disposals; } };
+  return { ctx, peer, calls, created, effects,
+    dispose: () => Promise.all(effects.map(dispose => dispose())),
+    get disposals() { return disposals; } };
 }
 
 for (const [channel, exportName] of clients) {
@@ -63,11 +68,17 @@ for (const [channel, exportName] of clients) {
     const directory = channel === 'office' ? 'shared' : channel;
     const file = channel === 'matrix' ? 'matrix-harness-client' : 'harness-client';
     const { [exportName]: Client } = await import(`../src/channels/${directory}/${file}.mjs`);
-    const client = new Client({ ...harnessConnection(f.ctx), workspace: '/workspace' });
+    const client = new Client({ ...harnessConnection(f.ctx), workspace: '/workspace',
+      commandExecutor: createHarnessCommandExecutor(f.ctx) });
     try {
       assert.equal(await client.createSession(), 'session');
       assert.equal(await client.sessionExists('session'), true);
       assert.deepEqual(await client.listModels(), { groups: [], failures: [] });
+      for (const line of ['/compact', '/clear', '/permission workspace-write']) {
+        assert.deepEqual(await client.executeCommand('session', line, { signal: new AbortController().signal }),
+          { result: { kind: 'success' } });
+      }
+      assert.equal(f.calls.filter(request => request.namespace === 'commands').length, 3);
       assert.deepEqual(f.created, [{ principal: { kind: 'owner' }, interactions: 'none' }]);
       assert.ok(f.calls.some(request => request.namespace === 'session' && request.method === 'create'));
       assert.ok(f.calls.some(request => request.namespace === 'workspace' && request.method === 'follow'));
@@ -90,7 +101,7 @@ test('one peer is shared by a Host adapter, released on unload, and replaced on 
     finish = Promise.withResolvers();
     return finish.promise;
   };
-  const pending = f.effects[0]();
+  const pending = f.dispose();
   assert.ok(pending instanceof Promise, 'the Host must await peer disposal');
   finish.resolve();
   await pending;
@@ -100,11 +111,11 @@ test('one peer is shared by a Host adapter, released on unload, and replaced on 
   assert.equal(reloaded.created.length, 1);
   assert.notEqual(reloaded.peer, f.peer);
   assert.equal(reloaded.peer.signal.aborted, false);
-  await reloaded.effects[0]();
+  await reloaded.dispose();
   const other = fixture();
   assert.notEqual(modernHarnessApi(other.ctx), api);
   assert.equal(other.created.length, 1);
-  await other.effects[0]();
+  await other.dispose();
 });
 
 test('older Hosts without createPeer retain their existing request format', async () => {
@@ -115,9 +126,97 @@ test('older Hosts without createPeer retain their existing request format', asyn
     return { items: [] };
   };
   const api = modernHarnessApi(f.ctx);
+  await createHarnessCommandExecutor(f.ctx)('session', '/compact');
   assert.deepEqual(await api.sessions.list({ rpcId: 'legacy', payload: {} }), {
     rpcId: 'legacy', result: { ok: true, value: { items: [] } },
   });
-  await f.effects[0]();
+  await f.dispose();
   assert.equal(f.created.length, 0);
+});
+
+test('commands initialized first share one peer with other channels and the session adapter', async () => {
+  const f = fixture();
+  const first = createHarnessCommandExecutor(f.ctx);
+  const second = createHarnessCommandExecutor({ ...f.ctx });
+  modernHarnessApi(f.ctx);
+  const signal = new AbortController().signal;
+  await first('one', '/compact', { signal });
+  await second('two', '/clear', { signal });
+  assert.equal(f.created.length, 1);
+  await f.dispose();
+  assert.equal(f.disposals, 1);
+});
+
+for (const field of [null, 'submittedAttachments']) {
+  test(`command argument adaptation to ${field ?? 'no attachments'} preserves its peer and executes once`, async () => {
+    const f = fixture();
+    let attempts = 0, executions = 0;
+    const signal = new AbortController().signal;
+    f.ctx.typertGateway.invoke = async request => {
+      attempts++;
+      assert.equal(request.peer, f.peer);
+      assert.equal(request.peer.signal.aborted, false);
+      assert.equal(request.signal, signal);
+      if (Object.hasOwn(request.args, 'images')) {
+        throw Object.assign(new Error('typert gateway: commands/execute: args fields do not match the descriptor: '
+          + (field ? 'missing "submittedAttachments"; ' : '') + 'unexpected "images"'), {
+          name: 'TypertGatewayError', code: 'gateway/arguments-invalid', endpoint: 'commands/execute',
+        });
+      }
+      assert.deepEqual(request.args, { agentId: 'session', line: '/compact', ...(field ? { [field]: [] } : {}) });
+      executions++;
+      return { result: { kind: 'success' } };
+    };
+    await createHarnessCommandExecutor(f.ctx)('session', '/compact', { signal });
+    assert.equal(attempts, 2);
+    assert.equal(executions, 1);
+    await f.dispose();
+    assert.equal(f.disposals, 1);
+  });
+}
+
+test('a command-only peer is released on unload and recreated on reload', async () => {
+  const f = fixture();
+  createHarnessCommandExecutor(f.ctx);
+  await f.dispose();
+  assert.equal(f.disposals, 1);
+  const next = fixture();
+  next.ctx.root = f.ctx.root;
+  await createHarnessCommandExecutor(next.ctx)('session', '/clear', { signal: new AbortController().signal });
+  assert.equal(next.created.length, 1);
+  await next.dispose();
+});
+
+test('an explicit command executor does not allocate a Host peer', () => {
+  const f = fixture();
+  const provided = async () => {};
+  assert.equal(createHarnessCommandExecutor(f.ctx, provided), provided);
+  assert.equal(f.created.length, 0);
+});
+
+test('an unregistered /clear reaches the Host with its peer and reports unsupported without rebinding', async () => {
+  const f = fixture();
+  let calls = 0;
+  const signal = new AbortController().signal;
+  f.ctx.typertGateway.invoke = async request => {
+    calls++;
+    assert.equal(request.peer, f.peer);
+    assert.equal(request.peer.signal.aborted, false);
+    assert.equal(request.signal, signal);
+    assert.deepEqual(request.args, { agentId: 'session', line: '/clear', images: [] });
+    return undefined; // DSH 0.2.1-rc.2 does not register /clear.
+  };
+  try {
+    const result = await runClearCommand('/clear', {
+      executeCommand: createHarnessCommandExecutor(f.ctx),
+      createSession: () => assert.fail('/clear must not fall back to /new'),
+    }, {
+      sessionFor: () => 'session',
+      bindSession: () => assert.fail('unsupported /clear must preserve the Session binding'),
+    }, 'direct:test', { signal });
+    assert.match(result.message, /当前 Host 不支持 \/clear，当前会话未修改/);
+    assert.equal(calls, 1);
+  } finally {
+    await f.dispose();
+  }
 });
