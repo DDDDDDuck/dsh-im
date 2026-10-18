@@ -1,3 +1,4 @@
+import { captureGroupHistory } from '../shared/group-history.mjs';
 import { BusyMessageDispatcher, canAutomaticallySteer } from '../shared/busy-message-dispatcher.mjs';
 import { isPermissionCommand, runPermissionCommand } from '../shared/permission-command.mjs';
 import { randomUUID } from 'node:crypto';
@@ -632,6 +633,8 @@ export class FeishuHarnessBridge {
   #harness;
   #state;
   #contextEnhancement;
+  #groupHistory;
+  #groupHistoryScope;
   #accessPolicy;
   #queues = new Map();
   #busyMessages = new BusyMessageDispatcher();
@@ -751,6 +754,8 @@ export class FeishuHarnessBridge {
     harness,
     state,
     contextEnhancement,
+    groupHistory,
+    groupHistoryScope = 'feishu',
     accessPolicy,
     status,
     allowedSenderOpenIds = new Set(),
@@ -812,6 +817,8 @@ export class FeishuHarnessBridge {
     this.#harness = harness;
     this.#state = state;
     this.#contextEnhancement = contextEnhancement;
+    this.#groupHistory = groupHistory;
+    this.#groupHistoryScope = groupHistoryScope;
     this.#accessPolicy = accessPolicy;
     this.#status = status;
     this.#allowedSenderOpenIds = allowedSenderOpenIds;
@@ -1154,6 +1161,22 @@ export class FeishuHarnessBridge {
   }
 
   accept(event) {
+    if (!this.#groupHistory || event?.message?.chat_type !== 'group') return this.#accept(event);
+    const content = extractInboundMessage({ ...event, message: { ...event.message, mentions: [] } }, this.#client);
+    const message = { ...content, kind: 'group', senderId: senderOpenId(event),
+      senderIsBot: isBotSender(event), addressed: this.#isAddressed(event) };
+    return captureGroupHistory(this.#groupHistory, message, {
+      channel: 'feishu', scope: this.#groupHistoryScope, groupId: event.message.chat_id,
+      messageId: event.message.message_id, sentAt: Number(event.message.create_time),
+      type: event.message.message_type, text: content.content,
+      threadId: event.message.thread_id, replyToMessageId: event.message.parent_id,
+      capability: '需授权 im:message.group_msg；授权采集不改变群回复模式。',
+    }, { accessPolicy: this.#accessPolicy,
+      allowed: !!this.#accessPolicy || isAllowedSender(event, this.#allowedSenderOpenIds), logger: this.#logger,
+    }).then(() => { event.groupHistory = message.groupHistory; return this.#accept(event); });
+  }
+
+  #accept(event) {
     if (this.#signal?.aborted) return Promise.resolve();
     const messageId = nonEmptyString(event?.message?.message_id);
     if (!messageId) return Promise.resolve();
@@ -4533,6 +4556,7 @@ export class FeishuHarnessBridge {
 
   #interactionAskOptions(event, key, files, images) {
     return {
+      groupHistory: event.groupHistory,
       timeoutMs: this.#replyTimeoutMs,
       signal: this.#signal,
       control: { owner: this, key },

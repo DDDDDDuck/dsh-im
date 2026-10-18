@@ -1,3 +1,4 @@
+import { captureGroupHistory, groupHistoryEntry } from '../shared/group-history.mjs';
 import { createConnectionDiagnostics, atConnectionStage } from '../shared/connection-error.mjs';
 import { createHash, randomBytes } from 'node:crypto';
 
@@ -724,6 +725,7 @@ export class WhatsappRuntime {
   #harness;
   #state;
   #contextEnhancement;
+  #groupHistory;
   #accessPolicy;
   #logger;
   #diagnostics;
@@ -744,6 +746,7 @@ export class WhatsappRuntime {
     harness,
     state,
     contextEnhancement,
+    groupHistory,
     accessPolicy,
     logger = console,
     replyTimeoutMs = 600_000,
@@ -759,6 +762,7 @@ export class WhatsappRuntime {
     this.#harness = harness;
     this.#state = state;
     this.#contextEnhancement = contextEnhancement;
+    this.#groupHistory = groupHistory;
     this.#accessPolicy = accessPolicy;
     this.#logger = logger; this.#diagnostics = createConnectionDiagnostics({ channel: 'whatsapp', logger });
     this.#replyTimeoutMs = replyTimeoutMs;
@@ -821,6 +825,23 @@ export class WhatsappRuntime {
             }),
           });
           if (!message || outboundIds.has(message.providerMessageId) || !this.#bridge) return;
+          let groupName;
+          if (this.#groupHistory && message.kind === 'group' && message.addressed) {
+            let timeout;
+            try {
+              groupName = (await Promise.race([
+                context?.socket?.groupMetadata?.(message.conversationId),
+                new Promise((resolve) => { timeout = setTimeout(resolve, 2500); timeout.unref?.(); }),
+              ]))?.subject;
+            } catch { /* optional metadata must not block normal replies */ }
+            finally { clearTimeout(timeout); }
+          }
+          if (!hasViewOnceWrapper(raw.message)) {
+            await captureGroupHistory(this.#groupHistory, message, groupHistoryEntry('whatsapp', raw, message, { groupName }), {
+              accessPolicy: this.#accessPolicy,
+              allowed: !!this.#accessPolicy || whatsappInboundAllowed(message, this.#config), logger: this.#logger,
+            });
+          }
           this.#status.lastCheckedAt = Date.now();
           await this.#bridge.accept(message);
         },

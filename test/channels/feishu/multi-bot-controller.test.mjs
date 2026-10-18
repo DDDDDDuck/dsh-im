@@ -493,6 +493,58 @@ test('group-message authorization grants only its scope, enables all mode, and r
   await fx.controller.close();
 });
 
+test('group recording authorization preserves mention mode', async () => {
+  const existing = bot('bot_group_permission', 'group_permission');
+  const fx = fixture({
+    bots: [existing],
+    secrets: { [existing.secretRef]: 'stable-secret' },
+    verifyApp: async () => ({
+      name: existing.botName,
+      openId: existing.botOpenId,
+      activated: existing.activated,
+    }),
+  });
+  await fx.controller.initialize();
+  const oldRuntime = fx.runtimes.get(existing.id)[0];
+
+  const started = fx.controller.startGroupMessagePermission(existing.id, { preserveResponseMode: true });
+  const duplicate = fx.controller.startGroupMessagePermission(existing.id, { preserveResponseMode: true });
+  const attemptId = started.registration.attempt;
+  assert.equal(duplicate.registration.attempt, attemptId);
+  assert.equal(started.registration.operation, 'group_message_permission');
+  assert.equal(started.registration.botId, existing.id);
+
+  await waitFor(() => fx.registrationRuns.length === 1);
+  const run = fx.registrationRuns.shift();
+  assert.equal(run.options.appId, existing.appId);
+  assert.equal(Object.hasOwn(run.options, 'createOnly'), false);
+  assert.deepEqual(run.options.addons, {
+    preset: false,
+    scopes: { tenant: ['im:message.group_msg'] },
+  });
+  run.options.onQRCodeReady({
+    url: callbackRepairQrUrl(existing.appId),
+    expireIn: 60,
+  });
+  run.resolve({
+    client_id: existing.appId,
+    client_secret: 'stable-secret',
+    user_info: { open_id: existing.ownerOpenIds[0], tenant_brand: existing.domain },
+  });
+
+  await waitFor(() => fx.controller.registrationStatus(attemptId).registration.state === 'succeeded');
+  const saved = fx.configStore.getBot(existing.id);
+  assert.equal(saved.groupMessagePermissionGranted, true);
+  assert.equal(saved.groupResponseMode ?? 'mention', 'mention');
+  assert.equal(oldRuntime.stops, 1);
+  assert.equal(fx.runtimes.get(existing.id).length, 2);
+  assert.equal(fx.runtimes.get(existing.id)[1].config.groupResponseMode ?? 'mention', 'mention');
+  const status = fx.controller.registrationStatus(attemptId);
+  assert.equal(status.bots[0].groupMessagePermissionGranted, true);
+  assert.equal(status.bots[0].groupResponseMode, 'mention');
+  await fx.controller.close();
+});
+
 test('cancelling group-message authorization before confirmation preserves mention mode', async () => {
   const existing = bot('bot_group_permission_cancel', 'group_permission_cancel');
   const fx = fixture({

@@ -1,3 +1,4 @@
+import { getGroupHistoryStore } from '../../group-history-runtime.mjs';
 import { getImageInputSettingsStore } from '../../../../src/channels/shared/image-input-settings-store.mjs';
 import { unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -181,6 +182,7 @@ export async function createTokenProductionController(ctx, config, internals, de
         ...(typeof createTransport === 'function' ? { createTransport } : {}),
         harness: workspaceScope.harness,
         state: workspaceScope.state,
+        groupHistory: internals.groupHistory ?? (['telegram', 'discord'].includes(channel) ? getGroupHistoryStore(ctx, config) : undefined),
         contextEnhancement: { botId, getSettings: () => workspaces.contextEnhancementFor(botId) },
         accessPolicy: accessPolicyProvider(workspaces, botId, { channel, config: botConfig }),
         replyTimeoutMs: config.replyTimeoutMs ?? 600_000,

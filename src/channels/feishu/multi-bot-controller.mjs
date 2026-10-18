@@ -339,7 +339,7 @@ export class MultiBotDshFeishuController {
     return this.registrationStatus(id);
   }
 
-  startGroupMessagePermission(botId) {
+  startGroupMessagePermission(botId, { preserveResponseMode = false } = {}) {
     this.#assertOpen();
     const target = this.#requireBot(botId);
     if (target.deletionPending) {
@@ -352,6 +352,7 @@ export class MultiBotDshFeishuController {
       if (active.operation !== GROUP_MESSAGE_PERMISSION_OPERATION) {
         throw new Error('Another Feishu app update is already active for this bot');
       }
+      if (Boolean(active.preserveResponseMode) !== preserveResponseMode) throw new Error('A different group permission update is already active');
       return this.registrationStatus(active.id);
     }
     this.#activeAppUpdates.delete(botId);
@@ -363,6 +364,7 @@ export class MultiBotDshFeishuController {
     const record = {
       id,
       operation: GROUP_MESSAGE_PERMISSION_OPERATION,
+      preserveResponseMode,
       manager: null,
       botId,
       createdNew: false,
@@ -1092,7 +1094,7 @@ export class MultiBotDshFeishuController {
         saved = await this.#configStore.saveBot({
           ...current,
           groupMessagePermissionGranted: true,
-          groupResponseMode: 'all',
+          groupResponseMode: record.preserveResponseMode ? current.groupResponseMode : 'all',
         });
       } catch (error) {
         throw this.#callbackRepairError(

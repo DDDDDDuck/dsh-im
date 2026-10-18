@@ -1,3 +1,4 @@
+import { installGroupHistoryTools } from '../../src/channels/shared/group-history-access.mjs';
 import { apply as applyDingtalk } from './channels/dingtalk/index.mjs';
 import { apply as applyDiscord } from './channels/discord/index.mjs';
 import { apply as applyOffice } from './channels/office/index.mjs';
@@ -32,7 +33,7 @@ export const inject = [
 ];
 
 function channelConfig(config, name, deliveryService) {
-  const channel = config[name] ?? {};
+  const channel = { ...(config.dshHome ? { dshHome: config.dshHome } : {}), ...config[name] };
   const withAuthority = config.rpcAuthority === undefined
     ? channel
     : { ...channel, rpcAuthority: config.rpcAuthority };
@@ -147,9 +148,11 @@ export function createImHostPlugin(internals = {}) {
     if (typeof ctx?.inject === 'function') {
       ctx.inject(['tools', 'systemPrompt'], (artifactCtx) => {
         installOutboundArtifactTool(artifactCtx);
+        installGroupHistoryTools(artifactCtx);
       });
     } else {
       installOutboundArtifactTool(ctx);
+      installGroupHistoryTools(ctx);
     }
     const logger = typeof ctx?.logger === 'function'
       ? ctx.logger(name)

@@ -1,3 +1,4 @@
+import { captureGroupHistory } from '../shared/group-history.mjs';
 import { BusyMessageDispatcher, canAutomaticallySteer } from '../shared/busy-message-dispatcher.mjs';
 import { isPermissionCommand, runPermissionCommand } from '../shared/permission-command.mjs';
 import { createDeferredDeliveryCoordinator, deferredOutcomeText } from '../shared/deferred-delivery-coordinator.mjs';
@@ -447,6 +448,7 @@ export class QqHarnessBridge {
   #state;
   #deferred;
   #contextEnhancement;
+  #groupHistory;
   #accessPolicy;
   #status;
   #logger;
@@ -475,6 +477,7 @@ export class QqHarnessBridge {
     harness,
     state,
     contextEnhancement,
+    groupHistory,
     accessPolicy,
     status = createQqBridgeStatus(),
     logger = console,
@@ -495,6 +498,7 @@ export class QqHarnessBridge {
     this.#harness = harness;
     this.#state = state;
     this.#contextEnhancement = contextEnhancement;
+    this.#groupHistory = groupHistory;
     this.#accessPolicy = accessPolicy;
     this.#status = status;
     this.#logger = logger;
@@ -518,6 +522,20 @@ export class QqHarnessBridge {
   }
 
   accept(message) {
+    if (!this.#groupHistory || message?.kind !== 'group') return this.#accept(message);
+    const normalized = { ...qqInboundMessage(message, { fetchImpl: this.#fetchImpl }), kind: 'group',
+      senderId: message.senderId, senderIsBot: message.senderIsBot, addressed: isQqMessageAddressed(message) };
+    return captureGroupHistory(this.#groupHistory, normalized, {
+      channel: 'qq', scope: `app:${this.#bot.appId}`, groupId: message.groupOpenid,
+      messageId: message.messageId, sentAt: message.timestamp, senderName: message.senderName,
+      text: message.raw?.content ?? message.content ?? '',
+      type: message.attachments?.length ? 'file' : 'text',
+      capability: '仅保存实际投递的消息；未 @ 能力及跨应用群身份尚需验证，当前按应用来源隔离。',
+    }, { accessPolicy: this.#accessPolicy, logger: this.#logger })
+      .then(() => { message.groupHistory = normalized.groupHistory; return this.#accept(message); });
+  }
+
+  #accept(message) {
     if (this.#signal?.aborted) return Promise.resolve();
     const messageId = nonEmptyString(message?.messageId);
     const sender = nonEmptyString(message?.senderId);
@@ -1266,6 +1284,7 @@ export class QqHarnessBridge {
           createOptions: { signal: this.#signal },
           existsOptions: { signal: this.#signal },
           askOptions: {
+            groupHistory: message.groupHistory,
             timeoutMs: this.#replyTimeoutMs,
             signal: this.#signal,
             control: { owner: this, key },

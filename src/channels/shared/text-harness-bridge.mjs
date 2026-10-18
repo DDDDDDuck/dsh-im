@@ -1286,6 +1286,7 @@ export class TextHarnessBridge {
         createOptions: this.#signal ? { signal: this.#signal } : undefined,
         existsOptions: this.#signal ? { signal: this.#signal } : undefined,
         askOptions: {
+          groupHistory: message.groupHistory,
           timeoutMs: this.#replyTimeoutMs,
           signal: this.#signal,
           control: { owner: this, key: conversationKey },

@@ -10,6 +10,28 @@ const EN = Object.freeze({
   ...diagnostics,
   ...imageInput,
   '$locale': 'en',
+  '保持本页打开，等待权限生效': 'Keep this page open while the permission takes effect',
+  "群聊天记录": "Group chat history",
+  "群聊天记录保留天数": "Group chat retention (days)",
+  "按群共享聊天记录及其附件，默认保留最近 14 天。修改后对所有启用采集的群生效。": "Share messages and attachments within each group. Keep the last 14 days by default. Changes apply to all groups with recording enabled.",
+  "保留天数": "Retention days",
+  "天": "days",
+  "缩短保留天数会清理过期记录及其群文件；调大天数不会恢复已删除内容。会话中已有的副本按原有规则保留。": "Reducing retention removes expired messages and group files. Increasing it cannot restore deleted data. Existing session copies follow their own retention settings.",
+  "群记录采集": "Group recording",
+  "先在目标群内 @ 机器人，再刷新列表并开启采集。开启后保存实际收到的普通消息和文件，不改变机器人的回复方式。": "Mention the bot in the target group, then refresh this list and enable recording. Received messages and files are saved without changing when the bot replies.",
+  "暂无已发现的群": "No groups discovered yet",
+  "开启采集": "Enable recording",
+  "已开启": "Enabled",
+  "正在读取群记录设置…": "Loading group history settings…",
+  "保留天数必须为正整数。": "Retention days must be a positive integer.",
+  "无法读取或保存群记录设置，请稍后重试。": "Unable to read or save group history settings. Try again.",
+  "群记录设置返回了无法识别的响应。": "Unrecognized group history settings response.",
+  "扫码会更新现有飞书应用，只增量开通“获取群组中所有消息”权限，不会创建新应用。单独授权采集时保留原来的回复方式；选择响应所有消息时才切换。": "Scanning updates the existing Feishu app with permission to receive all group messages. Separate recording authorization preserves the reply mode; selecting all-message replies changes it.",
+  "私聊始终响应；群聊仅处理明确 @当前机器人的消息。也可单独授权采集群消息，保持仅 @ 时回复。": "Direct messages always receive replies; groups require a mention. You can authorize group recording separately below.",
+  "需授权 im:message.group_msg；授权采集不改变群回复模式。": "Requires im:message.group_msg. Recording authorization does not change the reply mode.",
+  "关闭 Privacy Mode 或设为群管理员后才能接收普通群消息；只保存平台实际投递的消息。": "Disable Privacy Mode or make the bot a group administrator. Only messages actually delivered by the platform are saved.",
+  "需要频道访问权限及 MESSAGE_CONTENT；未授权时正文和附件可能为空。": "Requires channel access and MESSAGE_CONTENT. Text and attachments may be empty without authorization.",
+  "需订阅 message.channels / message.groups，并已加入目标频道。": "Subscribe to message.channels / message.groups and add the bot to the target channel.",
   '修改别名': 'Edit alias',
   '关闭修改别名': 'Close alias editor',
   '原名称': 'Original name',
@@ -1192,6 +1214,10 @@ function channelName(value) {
 }
 
 function translateDynamic(text) {
+  const savedMessages = /^已保存消息：(.*)$/.exec(text);
+  if (savedMessages) return `Saved messages: ${savedMessages[1]}`;
+  const groupRecording = /^(.*)的群记录采集$/.exec(text);
+  if (groupRecording) return `Group recording for ${groupRecording[1]}`;
   const configMessage = /^微信配置格式错误：(config\.json|workspaces\.json)。请查看诊断详情，修复后重启 DSH。$/.exec(text);
   if (configMessage) return EN['微信配置格式错误：{file}。请查看诊断详情，修复后重启 DSH。'].replace('{file}', configMessage[1]);
   const configHint = /^(.*?)请检查微信渠道数据目录中的 (config\.json|workspaces\.json)，修复后重启 DSH；“重新读取”不会重新加载配置。\s*(字段位置中的序号从 0 开始，按文件中的条目顺序计数，不包含真实账号标识。)?$/.exec(text);

@@ -1,3 +1,4 @@
+import { getGroupHistoryStore } from '../../group-history-runtime.mjs';
 import { getImageInputSettingsStore } from '../../../../src/channels/shared/image-input-settings-store.mjs';
 import { t } from '../../../../src/channels/shared/i18n.mjs';
 import { homedir } from 'node:os';
@@ -266,6 +267,7 @@ export async function createProductionController(ctx, config = {}, internals = {
         ownerOpenIds: botConfig.ownerOpenIds ?? [botConfig.ownerOpenId],
         harness: workspaceScope.harness,
         state: workspaceScope.state,
+        groupHistory: internals.groupHistory ?? getGroupHistoryStore(ctx, config),
         contextEnhancement: { botId: id, getSettings: () => workspaces.contextEnhancementFor(id) },
         accessPolicy: accessPolicyProvider(workspaces, id, {
           channel: 'feishu', config: botConfig,
