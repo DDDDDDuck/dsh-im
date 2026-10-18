@@ -52,19 +52,21 @@ export function GroupHistorySettings({ rpcCall }) {
     } catch (caught) { if (mounted.current) setError(caught.message); }
     finally { busy.current = false; if (mounted.current) setPhase('ready'); }
   };
-  return h('section', { className: 'dim-globalSection dim-groupHistorySettings', 'aria-label': '群聊天记录', 'aria-busy': phase === 'loading' },
-    h('h3', null, '群聊天记录保留天数'),
-    h('p', { className: 'dim-globalInline' }, '自动保存实际收到的群消息及其附件，按群共享，默认保留最近 14 天。修改后对所有群生效。'),
-    h('form', { className: 'dim-globalTtlRow', onSubmit: save },
-      h('label', { htmlFor: `${id}-days` }, '保留天数'),
-      h('input', { id: `${id}-days`, className: 'dim-globalTtlInput', type: 'number', min: 1, step: 1,
-        value: days, disabled: phase !== 'ready',
-        onChange: (event) => { setDays(event.target.value); setNotice(null); } }),
-      h('span', null, '天'),
-      h('button', { type: 'submit', className: 'dim-deliveryButton dim-globalSaveButton', 'data-kind': 'primary',
-        disabled: phase !== 'ready' }, phase === 'saving' ? '保存中…' : '保存')),
-    h('p', { className: 'dim-globalInline' }, '缩短保留天数会清理过期记录及其群文件；调大天数不会恢复已删除内容。会话中已有的副本按原有规则保留。'),
-    phase === 'loading' ? h('p', { role: 'status', className: 'dim-globalInline' }, '正在读取群记录设置…') : null,
-    error ? h('p', { role: 'alert', className: 'dim-globalInline', 'data-tone': 'error' }, error) : null,
-    notice ? h('p', { role: 'status', className: 'dim-globalInline' }, notice) : null);
+  return h('section', { className: 'dim-botGeneralSettings dim-groupHistorySettings', 'aria-label': '群聊天记录', 'aria-busy': phase === 'loading' || phase === 'saving' },
+    h('form', { onSubmit: save },
+      h('div', { className: 'dim-botGeneralRow' },
+        h('div', { className: 'dim-botGeneralText' },
+          h('label', { className: 'dim-botGeneralTitle', htmlFor: `${id}-days` }, '群聊天记录保留天数'),
+          h('p', { className: 'dim-botGeneralHelp', id: `${id}-description` }, '过期的群消息和文件会自动清理。')),
+        h('div', { className: 'dim-botGeneralControl dim-groupHistoryControl' },
+          h('input', { id: `${id}-days`, className: 'dim-groupHistoryInput', type: 'number', min: 1, step: 1,
+            value: days, disabled: phase !== 'ready', 'aria-describedby': `${id}-description`,
+            onChange: (event) => { setDays(event.target.value); setNotice(null); } }),
+          h('span', { className: 'dim-groupHistoryUnit' }, '天'))),
+      h('div', { className: 'dim-botGeneralActions' },
+        h('button', { type: 'submit', className: 'dim-deliveryButton dim-groupHistorySave', 'data-kind': 'primary',
+          disabled: phase !== 'ready' }, phase === 'saving' ? '保存中…' : '保存'))),
+    phase === 'loading' ? h('p', { role: 'status', className: 'dim-botGeneralHelp dim-groupHistoryFeedback' }, '正在读取群记录设置…') : null,
+    error ? h('p', { role: 'alert', className: 'dim-accessFeedback dim-groupHistoryFeedback', 'data-tone': 'error' }, error) : null,
+    notice ? h('p', { role: 'status', className: 'dim-botGeneralHelp dim-groupHistoryFeedback' }, notice) : null);
 }
