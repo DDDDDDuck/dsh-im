@@ -990,6 +990,8 @@ test('WhatsApp owner group messages require a mention or bot reply and never pro
   let replyEchoTask;
   let askCount = 0;
   const sent = [];
+  const captured = [];
+  const groupHistory = { query() {}, capture: async (entry) => { captured.push(entry); return { store: groupHistory, groupId: 'shared-group' }; } };
   const socket = {
     sendPresenceUpdate: async () => {},
     readMessages: async () => {},
@@ -1007,10 +1009,12 @@ test('WhatsApp owner group messages require a mention or bot reply and never pro
   const runtime = new WhatsappRuntime({
     config: linkedConfig({ accessMode: WHATSAPP_ACCESS_MODES.open }),
     authDir: '/tmp/test-whatsapp-linked-account-group',
+    groupHistory,
     harness: {
       ensureRunning: async () => {},
       sessionExists: async () => true,
-      ask: async () => {
+      ask: async (_id, _prompt, options) => {
+        assert.equal(options.groupHistory.groupId, 'shared-group');
         askCount += 1;
         return 'Harness group answer';
       },
@@ -1035,6 +1039,8 @@ test('WhatsApp owner group messages require a mention or bot reply and never pro
   };
   await callbacks.onMessage(inbound);
   assert.equal(askCount, 0, 'ordinary owner group messages must stay silent');
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].text, 'hello from my group');
   assert.equal(sent.length, 0, 'ignored messages send no placeholder or reaction');
   inbound.key.id = 'linked-account-mentioned';
   inbound.message = { extendedTextMessage: {
@@ -1077,6 +1083,7 @@ test('WhatsApp owner group messages require a mention or bot reply and never pro
   });
   await replyEchoTask;
   assert.equal(askCount, 2, 'replying to the bot\'s edited response triggers once');
+  assert.equal(captured.length, 4, 'outbound echoes are not archived');
 });
 
 test('WhatsApp runtime sends result files with native metadata, quote, stable id, and upload timeout', async (t) => {

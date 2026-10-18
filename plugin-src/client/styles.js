@@ -643,10 +643,11 @@ const CSS = String.raw`
 .dim-botGeneralHelp { margin: 0; color: var(--dsw-alias-label-tertiary, #8f959e); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
 .dim-botGeneralPanelHelp { padding-bottom: 16px; border-bottom: 1px solid var(--dsw-alias-border-l2, #dfe1e5); }
 .dim-botGeneralControl { position: relative; min-width: 0; max-width: 100%; justify-self: end; color: var(--dsw-alias-label-primary, #1f2329); }
-.dim-botGeneralControl select { display: block; min-width: 104px; max-width: 100%; height: 36px; padding: 0 36px 0 14px; border: 0; border-radius: 10px; color: inherit; background: var(--dsw-alias-bg-module-platform, #f5f6f7); font: inherit; font-size: 14px; line-height: 22px; appearance: none; cursor: pointer; }
-.dim-botGeneralControl select:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, #eef0f3); }
-.dim-botGeneralControl select:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #3370ff); outline-offset: 2px; }
-.dim-botGeneralControl select:disabled { opacity: .5; cursor: not-allowed; }
+.dim-botGeneralControl select, .dim-groupHistoryInput { display: block; min-width: 104px; max-width: 100%; height: 36px; padding: 0 36px 0 14px; border: 0; border-radius: 10px; color: inherit; background: var(--dsw-alias-bg-module-platform, #f5f6f7); font: inherit; font-size: 14px; line-height: 22px; appearance: none; }
+.dim-botGeneralControl select { cursor: pointer; }
+.dim-botGeneralControl select:hover:not(:disabled), .dim-groupHistoryInput:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, #eef0f3); }
+.dim-botGeneralControl select:focus-visible, .dim-groupHistoryInput:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #3370ff); outline-offset: 2px; }
+.dim-botGeneralControl select:disabled, .dim-groupHistoryInput:disabled { opacity: .5; cursor: not-allowed; }
 .dim-botGeneralControl svg { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); pointer-events: none; }
 .dim-botGeneralControl .dim-contextSwitch { display: block; }
 .dim-botGeneralControl .dim-contextSwitch:disabled { opacity: .5; cursor: not-allowed; }
@@ -665,6 +666,13 @@ const CSS = String.raw`
 .dim-generalSettingsTab[aria-selected="true"]::after { background: var(--dim-blue); transform: scaleX(1); }
 .dim-generalSettingsTab:focus-visible { outline: 2px solid var(--dim-blue); outline-offset: -2px; border-radius: 5px; }
 .dim-generalSettingsTabPanel { min-width: 0; padding-top: 14px; }
+.dim-groupHistoryControl { width: 104px; }
+.dim-groupHistoryInput { box-sizing: border-box; width: 100%; appearance: textfield; }
+.dim-groupHistoryInput::-webkit-inner-spin-button, .dim-groupHistoryInput::-webkit-outer-spin-button { margin: 0; appearance: none; }
+.dim-groupHistoryUnit { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 18px; pointer-events: none; }
+.dim-deliveryButton.dim-groupHistorySave { min-width: 58px; min-height: 36px; border-radius: 10px; }
+.dim-groupHistoryFeedback { margin-top: 12px; }
+
 .dim-globalSection { min-width: 0; padding: 14px 16px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 12px; background: var(--dsw-alias-bg-layer-3, #fff); }
 .dim-globalSection + .dim-globalSection { margin-top: 12px; }
 .dim-imageSettings { container-type: inline-size; }

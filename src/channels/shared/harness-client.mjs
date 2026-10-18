@@ -1,3 +1,4 @@
+import { groupHistoryAccess } from './group-history-access.mjs';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
@@ -1935,6 +1936,7 @@ export class HarnessClient {
       this.#registerControlOwnership(ownership);
     }
     // Advertise delivery only when this request can actually claim its files.
+    const closeGroupHistoryAccess = groupHistoryAccess.open(sessionId, promptRpcId, options.groupHistory);
     const closeArtifactConsumer = typeof onArtifact === 'function'
       ? outboundArtifactRegistry.openConsumer(sessionId, promptRpcId)
       : null;
@@ -2185,6 +2187,7 @@ export class HarnessClient {
         }
       }
       closeArtifactConsumer?.();
+      closeGroupHistoryAccess();
       if (ownership) {
         this.#unregisterControlOwnership(ownership);
         this.#unregisterInteractionOwnership(sessionId, ownership);

@@ -1,3 +1,4 @@
+import { captureGroupHistory, groupHistoryEntry } from '../shared/group-history.mjs';
 import { extractConnectionEvidence, createConnectionDiagnostics, atConnectionStage } from '../shared/connection-error.mjs';
 
 import { createEditableMessageStream } from '../shared/editable-message-stream.mjs';
@@ -1107,6 +1108,7 @@ export class TelegramRuntime {
   #harness;
   #state;
   #contextEnhancement;
+  #groupHistory;
   #accessPolicy;
   #logger;
   #diagnostics;
@@ -1136,6 +1138,7 @@ export class TelegramRuntime {
     harness,
     state,
     contextEnhancement,
+    groupHistory,
     accessPolicy,
     logger = console,
     replyTimeoutMs = 600_000,
@@ -1151,6 +1154,7 @@ export class TelegramRuntime {
     this.#harness = harness;
     this.#state = state;
     this.#contextEnhancement = contextEnhancement;
+    this.#groupHistory = groupHistory;
     this.#accessPolicy = accessPolicy;
     this.#logger = logger; this.#diagnostics = createConnectionDiagnostics({ channel: 'telegram', logger });
     this.#replyTimeoutMs = replyTimeoutMs;
@@ -1424,6 +1428,9 @@ export class TelegramRuntime {
           loadReplyContent: (reference, options) => this.#loadReplyContent(reference, options),
         });
         if (message) {
+          await captureGroupHistory(this.#groupHistory, message, groupHistoryEntry('telegram', update, message), {
+            logger: this.#logger,
+          });
           void this.#bridge.accept(message, { contextSnapshot }).catch((error) => {
             if (signal.aborted) return;
             this.#logger.error?.(

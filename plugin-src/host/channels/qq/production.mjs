@@ -1,3 +1,4 @@
+import { getGroupHistoryStore } from '../../group-history-runtime.mjs';
 import { getImageInputSettingsStore } from '../../../../src/channels/shared/image-input-settings-store.mjs';
 import { unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -128,6 +129,7 @@ export async function createProductionController(ctx, config = {}, internals = {
         appSecret,
         harness: workspaceScope.harness,
         state: workspaceScope.state,
+        groupHistory: internals.groupHistory ?? getGroupHistoryStore(ctx, config),
         contextEnhancement: { botId, getSettings: () => workspaces.contextEnhancementFor(botId) },
         accessPolicy: accessPolicyProvider(workspaces, botId, {
           channel: 'qq', config: botConfig,
