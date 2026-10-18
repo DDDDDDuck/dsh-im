@@ -1,6 +1,7 @@
 export const IM_STYLE_ID = 'xmanrui-dsh-im-settings';
 
 const CSS = String.raw`
+.dim-sidebarIcon { display: block; flex: none; background-color: currentColor; mask-repeat: no-repeat; mask-position: center; mask-size: 142%; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center; -webkit-mask-size: 142%; }
 .dim-pluginOpen { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 7px 14px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; }
 .dim-pluginOpen:hover { background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
 .dim-pluginOpen:focus-visible, .dim-pluginBack:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #3370ff); outline-offset: 3px; }

@@ -567,7 +567,11 @@ export function apply(ctx) {
     preferredSectionId: props.preferredSectionId,
   });
 
-  installImPluginPage(ctx, { packageName: manifest.name, renderPanel: buildPanelElement });
+  installImPluginPage(ctx, {
+    packageName: manifest.name,
+    renderPanel: buildPanelElement,
+    iconUrl: process.env.DSH_IM_PLUGIN_ICON,
+  });
 
   ctx.effect(() => {
     let disposed = false;

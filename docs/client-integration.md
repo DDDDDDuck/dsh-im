@@ -8,6 +8,10 @@ The optional `dshImClient` service exposes the existing IM management panel to a
 
 On DSH versions with plugin detail actions, **Open IM bots** opens the same management panel in the main area, with **Back to plugin details** returning to this plugin. This entry uses the optional `layout` and `pluginNavigation` services and the `plugins.detail.actions` slot. Older DSH versions retain the Settings entry.
 
+支持 `sidebar.panellist` 的宿主同时提供左侧「IM机器人」入口，与插件详情操作共用同一个 `main` 面板。侧栏以插件页原图的透明轮廓配合 `currentColor` 显示单色图标，跟随侧栏颜色与图标尺寸；插件页仍使用原彩色图标。此入口不调用 `setSettingsVisible()`，设置入口和插件详情操作均保留。侧栏槽位消失时只移除侧栏入口，主面板或依赖服务退出时清理全部对应注册。
+
+Hosts with `sidebar.panellist` also show **IM bots** in the left sidebar, targeting the same `main` panel as the detail action. The sidebar masks the catalog artwork with `currentColor` at the host's icon size; the catalog keeps its original color image. This entry does not call `setSettingsVisible()`: both existing entry points remain available. Sidebar withdrawal removes only its entry, while main-slot or navigation-service withdrawal cleans up all related registrations.
+
 ```ts
 interface DshImClient {
   readonly version: 1;
@@ -72,13 +76,17 @@ Hide settings only after both the replacement navigation and content are availab
 ## 兼容与布局 / Compatibility and layout
 
 - 老宿主缺少 `ctx.provide` 时只跳过新服务，原设置页正常注册。旧版 dsh-im 没有该服务时，让可选集成保持未激活即可。
-- dsh-im 不依赖或注册桌面端侧栏槽位。容器的高度、留白、滚动和可达入口由宿主负责；现有面板不保证适配任意狭窄容器。
+- dsh-im 使用 DSH 通用的 `sidebar.panellist` 和 `main` 槽位，不依赖桌面端专用 API。自定义嵌入容器的高度、留白、滚动和可达入口由宿主负责；现有面板不保证适配任意狭窄容器。
 - 面板复用现有的管理 RPC、权限、目录选择和更新能力，无法借此绕过 host 权限限制。
 - Without `ctx.provide`, the original settings section still registers. An optional shell integration stays inactive when an older dsh-im has no service.
-- dsh-im neither imports nor registers desktop sidebar slots. The shell owns navigation, height, padding and scrolling. The existing panel is not guaranteed to fit an arbitrarily narrow container.
+- dsh-im uses the generic DSH `sidebar.panellist` and `main` slots without desktop-specific APIs. Custom embedding shells own navigation, height, padding and scrolling. The existing panel is not guaranteed to fit an arbitrarily narrow container.
 - Existing management RPC, permissions, directory selection and update behavior apply equally to both render paths.
 
 ## 可选桌面接入 / Optional desktop integration
+
+新版通用侧栏入口无需安装此接入。以下独立接入用于旧版 Tauri 桌面壳；它会隐藏设置入口，与新版默认保留设置入口的行为不同。
+
+The built-in sidebar entry does not require this integration. The separate integration below targets older Tauri shells and hides Settings, unlike the current built-in entry.
 
 源码仓库的 `integrations/desktop-panel` 提供可安装的桌面消费插件及安装说明，侧栏名称与设置页一致：中文「IM机器人」、英文「IM bots」。它只在桌面 iframe 中启用，普通浏览器仍保留设置入口。该独立目录不包含在 dsh-im 的 npm 发布包中，也不代表桌面端已经内置接入。
 

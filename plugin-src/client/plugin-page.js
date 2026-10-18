@@ -21,9 +21,17 @@ function ImPluginPage({ renderPanel, onBack, t }) {
       renderPanel()));
 }
 
+function ImSidebarIcon({ size, iconUrl }) {
+  return h('span', {
+    className: 'dim-sidebarIcon', 'aria-hidden': true,
+    style: { width: size, height: size, maskImage: `url("${iconUrl}")`,
+      WebkitMaskImage: `url("${iconUrl}")` },
+  });
+}
+
 // Optional services and slots keep the existing settings entry working on
 // older DSH versions. Reuse the same panel through public navigation APIs.
-export function installImPluginPage(ctx, { packageName, renderPanel }) {
+export function installImPluginPage(ctx, { packageName, renderPanel, iconUrl }) {
   if (typeof ctx.inject !== 'function') return;
   ctx.inject(['layout', 'pluginNavigation'], (pageCtx) =>
     pageCtx.slots.inject('main', () => {
@@ -34,6 +42,12 @@ export function installImPluginPage(ctx, { packageName, renderPanel }) {
           onBack: () => pageCtx.pluginNavigation.openBundle(packageName),
         }),
       }, ImPluginPage);
+      const stopSidebar = pageCtx.slots.inject('sidebar.panellist', () =>
+        pageCtx.slots.register({
+          name: 'sidebar.panellist', id: IM_MAIN_PANEL_ID,
+          order: 30, label: () => pageCtx.locale.bind(IM_LOCALE_NAMESPACE)('IM机器人'),
+          locale: IM_LOCALE_NAMESPACE, inject: () => ({ iconUrl }),
+        }, ImSidebarIcon));
       const stopActions = pageCtx.slots.inject('plugins.detail.actions', () =>
         pageCtx.slots.register({
           name: 'plugins.detail.actions', id: 'xmanrui-dsh-im-open',
@@ -45,6 +59,7 @@ export function installImPluginPage(ctx, { packageName, renderPanel }) {
         }, OpenImAction));
       return () => {
         stopActions();
+        stopSidebar();
         unregisterPage();
       };
     }));

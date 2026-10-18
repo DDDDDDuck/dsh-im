@@ -12,7 +12,7 @@ const bundle = { kind: 'bundle', pkg: { name: packageName } };
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 function slotLedger(ready) {
-  const declarations = new Set(ready ? ['main', 'plugins.detail.actions'] : []);
+  const declarations = new Set(ready ? ['main', 'plugins.detail.actions', 'sidebar.panellist'] : []);
   const entries = new Map();
   const waiting = new Set();
   return {
@@ -50,11 +50,13 @@ async function start(t, { ready = true } = {}) {
   const opened = [];
   let renders = 0;
   root.provide('slots', slots);
+  root.provide('locale', { bind: () => (key) => key });
   const plugin = root.plugin({
     name: 'test-plugin-page',
     apply(ctx) {
       installImPluginPage(ctx, {
         packageName,
+        iconUrl: 'data:image/webp;base64,plugin-artwork',
         renderPanel: () => { renders++; return React.createElement('p', null, 'Shared IM panel'); },
       });
     },
@@ -133,11 +135,36 @@ test('the action is limited to dsh-im bundle and component details', async (t) =
   assert.equal(renderer.root.findAllByType('button').length, 1);
 });
 
-test('optional services can arrive late and withdrawing navigation removes both entries', async (t) => {
+test('sidebar opens the existing main panel and reuses the catalog artwork at the requested size', async (t) => {
+  const host = await start(t);
+  await host.provideNavigation();
+  const { options } = host.slots.entries.get('sidebar.panellist');
+  assert.equal(options.id, host.slots.entries.get('main').options.key);
+  assert.equal(options.label(), 'IM机器人');
+  assert.ok(host.slots.entries.has('plugins.detail.actions'));
+  let renderer;
+  t.after(() => act(() => renderer?.unmount()));
+  for (const size of [16, 18]) {
+    act(() => { renderer = create(host.element('sidebar.panellist', { size })); });
+    const icon = renderer.root.findByType('span');
+    assert.equal(icon.props['aria-hidden'], true);
+    assert.equal(icon.props.style.width, size);
+    assert.equal(icon.props.style.height, size);
+    assert.equal(icon.props.style.maskImage, 'url("data:image/webp;base64,plugin-artwork")');
+    act(() => renderer.unmount());
+  }
+  assert.equal(host.renders, 0, 'the sidebar must not mount a second management panel');
+  host.slots.declare('sidebar.panellist', false);
+  assert.equal(host.slots.entries.size, 2, 'original main panel and details action remain available');
+  host.slots.declare('sidebar.panellist', true);
+  assert.equal(host.slots.entries.size, 3);
+});
+
+test('optional services can arrive late and withdrawing navigation removes all entries', async (t) => {
   const host = await start(t);
   assert.equal(host.slots.entries.size, 0);
   const navigation = await host.provideNavigation();
-  assert.equal(host.slots.entries.size, 2);
+  assert.equal(host.slots.entries.size, 3);
   await navigation.dispose();
   await flush();
   assert.equal(host.slots.entries.size, 0);
@@ -152,10 +179,12 @@ test('slot withdrawal and plugin disposal cancel active registrations and pendin
   assert.equal(host.slots.entries.size, 1);
   host.slots.declare('plugins.detail.actions', true);
   assert.equal(host.slots.entries.size, 2);
+  host.slots.declare('sidebar.panellist', true);
+  assert.equal(host.slots.entries.size, 3);
   host.slots.declare('main', false);
   assert.equal(host.slots.entries.size, 0);
   host.slots.declare('main', true);
-  assert.equal(host.slots.entries.size, 2);
+  assert.equal(host.slots.entries.size, 3);
   host.slots.declare('plugins.detail.actions', false);
   await host.plugin.dispose();
   host.slots.declare('plugins.detail.actions', true);
