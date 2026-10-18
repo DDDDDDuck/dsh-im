@@ -91,6 +91,8 @@ Built-in channels with image input support can send JPEG, PNG, and WebP images, 
 
 ### Shared group messages and files
 
+Feishu QR creation and **Complete permissions** (including `/repair` in a direct chat) request both `im:message.group_msg` for group messages without mentions and `im:message:readonly` for message attachments. The platform skips permissions already granted; complete any publication or approval Feishu requires. The plugin saves the group-permission state after authorization. New bots still reply only when mentioned by default, existing bots retain their reply mode, and group recording must be enabled separately.
+
 Open **DSH Settings → IM Bots → General settings → General** to configure group records. Retention defaults to a rolling **14 days** and accepts other positive whole-day values. Mention the bot in the target group (or reply to a known bot message on WhatsApp), refresh the discovered-group list, and enable recording for that group. Recording is off by default. Ordinary messages and attachments actually delivered by the platform are saved silently without starting a model turn or sending a reply. Ask a bot in the group about previous messages or files to query pages and read file copies on demand.
 
 Records live in `<DSH_HOME>/integrations/dsh-im/group-history.sqlite`, with originals in the adjacent `group-files/` directory. They belong to the group independently of bots, AI Sessions, and workspaces. Originals expire with their messages; existing Session content and file copies retain their own lifecycle. Recording starts from messages received after enabling it, without full-history backfill or crawling the platform's file library.

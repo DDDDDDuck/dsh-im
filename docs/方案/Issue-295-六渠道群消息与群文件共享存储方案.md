@@ -53,6 +53,8 @@
 
 飞书消息事件及资源下载分别见[接收消息][feishu-receive]、[获取消息中的资源文件][feishu-resource]。这些平台条件与插件的“群记录采集”开关独立，打开本地采集不会自动授予平台权限。
 
+实现补充：飞书扫码新增和“补全权限”（含 `/repair`）现均申请 `im:message.group_msg` 与 `im:message:readonly`。授权完成后保存 `groupMessagePermissionGranted`，新机器人默认仅 @ 回复，已有机器人保留原回复方式；不会自动开启群采集。手动填写凭据不会被当成已完成这两项授权。
+
 ### 当前源码依据
 
 | 范围 | 相关文件 |

@@ -1238,6 +1238,17 @@ export class MultiBotDshFeishuController {
           }
         }
 
+        // The SDK update includes group-message access. Persist that fact
+        // without changing the bot's response mode or any group recording switch.
+        record.stage = 'persisting_permissions';
+        let saved;
+        try {
+          saved = await this.#configStore.saveBot({ ...current, groupMessagePermissionGranted: true });
+        } catch (error) {
+          throw this.#callbackRepairError(record, 'repair_permissions_save_failed',
+            'The permissions were accepted, but their local state could not be saved.', error);
+        }
+
         let currentRuntime;
         // Callback subscriptions are delivered over the long connection.
         // Always replace it after the platform-side callback update commits,
@@ -1245,7 +1256,7 @@ export class MultiBotDshFeishuController {
         // still reports healthy, so the probe never runs on stale metadata.
         record.stage = 'restarting';
         try {
-          await this.#startRuntime(current, appSecret);
+          await this.#startRuntime(saved, appSecret);
           currentRuntime = this.#runtimes.get(record.botId);
         } catch (error) {
           // The returned credential was already verified and persisted. Do
@@ -1361,6 +1372,7 @@ export class MultiBotDshFeishuController {
         // their stored values, undefined falls through to the defaults here).
         stepPush: existing?.stepPush ?? true,
         stepPushMode: existing?.stepPushMode ?? DEFAULT_FEISHU_STEP_PUSH_MODE,
+        groupMessagePermissionGranted: true,
         deletionPending: false,
         connectedAt: new Date().toISOString(),
         createdAt: existing?.createdAt ?? new Date().toISOString(),

@@ -105,6 +105,7 @@ const PUBLIC_ERROR_MESSAGES = Object.freeze({
   credential_update_failed: 'Unable to store the repaired Feishu credentials.',
   credential_state_unknown: 'The repaired Feishu credentials could not be confirmed after saving.',
   repair_connection_failed: 'The callback update was accepted, but the selected bot could not reconnect.',
+  repair_permissions_save_failed: 'Feishu granted the permissions, but their local state could not be saved. Please retry.',
   group_message_permission_required: 'Authorize access to all group messages before enabling this mode.',
   group_message_permission_save_failed: 'Feishu granted the permission, but all-message mode could not be saved.',
   group_message_permission_connection_failed: 'Feishu granted the permission, but the selected bot could not reconnect.',

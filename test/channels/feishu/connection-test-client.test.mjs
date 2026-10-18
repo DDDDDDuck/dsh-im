@@ -72,6 +72,7 @@ test('Feishu connection check requests and displays test-message feedback', asyn
   assert.equal(repairButton.props['aria-describedby'], repairTooltip.props.id);
   assert.match(textOf(repairTooltip), /card\.action\.trigger/);
   assert.match(textOf(repairTooltip), /im:message:readonly/);
+  assert.match(textOf(repairTooltip), /im:message\.group_msg/);
   assert.match(textOf(repairTooltip), /im:resource/);
   await act(async () => renderer.unmount());
 
@@ -486,6 +487,8 @@ test('Feishu callback repair keeps a Host-submitted attempt when a stale QR canc
   );
   assert.match(textOf(renderer.toJSON()), /不会创建新应用/);
   assert.match(textOf(renderer.toJSON()), /im:message:readonly/);
+  assert.match(textOf(renderer.toJSON()), /im:message\.group_msg/);
+  assert.match(textOf(renderer.toJSON()), /不会改变群回复方式或开启群记录采集/);
   assert.match(textOf(renderer.toJSON()), /im:resource/);
   assert.match(textOf(renderer.toJSON()), /获取单聊、群组消息/);
   assert.match(textOf(renderer.toJSON()), /当前缺少/);
