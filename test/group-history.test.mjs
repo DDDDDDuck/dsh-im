@@ -3,6 +3,7 @@ import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
+import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { GroupHistoryStore } from '../src/channels/shared/group-history-store.mjs';
 import { GroupHistoryAccessRegistry, createGroupHistoryTools } from '../src/channels/shared/group-history-access.mjs';
@@ -18,15 +19,14 @@ async function fixture(t, options = {}) {
   let now = base;
   const store = new GroupHistoryStore(root, { now: () => now, logger: { warn() {} }, ...options });
   t.after(async () => { await store.close(); await rm(root, { recursive: true, force: true }); });
-  const group = await store.capture(entry('discover'), { discover: true });
+  const group = await store.capture(entry('expired-bootstrap', { sentAt: base - 15 * DAY }));
   return { root, store, groupId: group.groupId, advance: (ms) => { now += ms; } };
 }
 
-test('silent capture is opt-in, shared across bots, deduplicated and independent of sessions', async (t) => {
+test('silent capture is on by default, shared across bots, deduplicated and independent of sessions', async (t) => {
   const { store, groupId } = await fixture(t);
   assert.equal((await store.query(groupId)).items.length, 0);
   assert.equal((await store.settings()).groupHistoryRetentionDays, 14);
-  await store.setEnabled(groupId, true);
   let downloads = 0;
   await store.capture(entry('m1'));
   await store.capture(entry('m1', { attachments: [{ key: 'file:0', name: 'a.txt', load: async () => {
@@ -41,14 +41,12 @@ test('silent capture is opt-in, shared across bots, deduplicated and independent
   assert.equal(page.items.length, 1);
   assert.equal(page.items[0].attachments[0].status, 'ready');
   assert.equal(downloads, 1);
-  await store.setEnabled(groupId, false);
   await store.capture(entry('m2'));
-  assert.equal((await store.query(groupId)).items.length, 1);
+  assert.equal((await store.query(groupId)).items.length, 2);
 });
 
 test('archive files are group-scoped; model edits only affect copies; copies have cleanup', async (t) => {
   const { store, groupId, root, advance } = await fixture(t);
-  await store.setEnabled(groupId, true);
   await store.capture(entry('file', { attachments: [{ key: 'file:0', name: '../../original.txt',
     load: async function* () { yield Buffer.from('first '); yield Buffer.from('second'); } }] }));
   await store.idle();
@@ -70,7 +68,6 @@ test('archive files are group-scoped; model edits only affect copies; copies hav
 
 test('download failures and oversize streams do not stall capture', async (t) => {
   const { store, groupId } = await fixture(t, { maxFileBytes: 4 });
-  await store.setEnabled(groupId, true);
   await store.capture(entry('files', { attachments: [
     { key: 'large', load: async function* () { yield Buffer.from('123'); yield Buffer.from('456'); } },
     { key: 'fail', load: () => { throw new Error('https://secret-token.example'); } },
@@ -86,7 +83,6 @@ test('download failures and oversize streams do not stall capture', async (t) =>
 
 test('a provider ignoring cancellation still releases its slot after the download timeout', async (t) => {
   const { store, groupId } = await fixture(t, { downloadTimeoutMs: 20 });
-  await store.setEnabled(groupId, true);
   await store.capture(entry('hung', { attachments: [{ key: 'hang', load: () => new Promise(() => {}) }] }));
   await Promise.all([store.idle(), delay(50)]);
   assert.equal((await store.query(groupId, { kind: 'files' })).items[0].status, 'failed');
@@ -94,7 +90,6 @@ test('a provider ignoring cancellation still releases its slot after the downloa
 
 test('retention persists, cleans more than one batch, and reads exclude overdue rows immediately', async (t) => {
   const { store, groupId, root, advance } = await fixture(t);
-  await store.setEnabled(groupId, true);
   for (let i = 0; i < 505; i++) await store.capture(entry(`old-${i}`));
   advance(15 * DAY);
   assert.equal((await store.query(groupId)).items.length, 0);
@@ -119,7 +114,6 @@ test('corrupt retention settings fail closed and can be repaired explicitly', as
 
 test('queries paginate within byte budget and reject cross-group cursors', async (t) => {
   const { store, groupId } = await fixture(t);
-  await store.setEnabled(groupId, true);
   for (let i = 0; i < 5; i++) await store.capture(entry(`long-${i}`, { text: '群'.repeat(9000),
     attachments: Array.from({ length: 15 }, (_, index) => ({ key: String(index), name: '附'.repeat(512) })) }));
   await store.idle();
@@ -130,24 +124,50 @@ test('queries paginate within byte budget and reject cross-group cursors', async
     for (const item of page.items) { assert.equal(ids.has(item.id), false); ids.add(item.id); assert.ok(item.textTruncated); }
     cursor = page.nextCursor;
     if (cursor) {
-      const other = await store.capture(entry('other', { groupId: 'other@g.us' }), { discover: true });
+      const other = await store.capture(entry('other', { groupId: 'other@g.us' }));
       await assert.rejects(store.query(other.groupId, { cursor }), /游标无效/);
     }
   } while (cursor);
   assert.equal(ids.size, 5);
 });
 
-test('discovery checks access; Telegram/Slack use source message identity, not delivery or thread identity', async () => {
+test('ordinary group messages are captured without discovery; private messages are excluded', async (t) => {
+  const { store } = await fixture(t);
+  const message = { kind: 'group', senderId: 'person', addressed: false };
+  await captureGroupHistory(store, message, entry('first', { groupId: 'new@g.us',
+    attachments: [{ key: 'file:0', name: 'first.txt', load: () => Buffer.from('first ordinary file') }] }));
+  await store.idle();
+  const page = await store.query(message.groupHistory.groupId);
+  assert.equal(page.items.length, 1);
+  assert.equal(page.items[0].text, 'message first');
+  assert.equal(page.items[0].attachments[0].status, 'ready');
+  assert.equal(page.recordingStartedAt, base);
+  const privateMessage = { kind: 'direct', senderId: 'person' };
+  await captureGroupHistory(store, privateMessage, entry('private'));
+  assert.equal(privateMessage.groupHistory, undefined);
+});
+
+test('groups previously saved as disabled record automatically after upgrade', async (t) => {
+  const { store, root, groupId } = await fixture(t);
+  await store.close();
+  const legacy = new DatabaseSync(join(root, 'group-history.sqlite'));
+  legacy.exec('ALTER TABLE groups ADD COLUMN enabled INTEGER NOT NULL DEFAULT 0');
+  legacy.close();
+  const upgraded = new GroupHistoryStore(root, { now: () => base });
+  t.after(() => upgraded.close());
+  const context = await upgraded.capture(entry('after-upgrade'));
+  assert.equal(context.groupId, groupId);
+  assert.equal((await upgraded.query(groupId)).items[0].text, 'message after-upgrade');
+  await upgraded.close();
+});
+
+test('Telegram/Slack use source message identity, not delivery or thread identity', async () => {
   let captured;
   const store = { capture: async (...args) => { captured = args; return { store, groupId: 'g' }; } };
   const message = { kind: 'group', senderId: 'person', addressed: false };
   await captureGroupHistory(store, message, entry('x'));
-  assert.equal(captured[1].discover, false);
-  message.addressed = true;
-  await captureGroupHistory(store, message, entry('x'), { allowed: false });
-  assert.equal(captured[1].discover, false);
-  await captureGroupHistory(store, message, entry('x'));
-  assert.equal(captured[1].discover, true);
+  assert.equal(captured[0].messageId, 'x');
+  assert.equal(captured.length, 1);
   const tg = groupHistoryEntry('telegram', { update_id: 20, message: { message_id: 10, chat: { id: -1 }, message_thread_id: 3 } }, message);
   assert.equal(tg.messageId, '10'); assert.equal(tg.groupId, '-1'); assert.equal(tg.threadId, '3');
   const slack = groupHistoryEntry('slack', { event_id: 'Ev1', team_id: 'T1', event: { channel: 'C1', ts: '1700000000.1', thread_ts: '1700000000.0' } }, message);
@@ -185,7 +205,7 @@ test('settings RPC rejects unknown parameters and persists valid retention', asy
   const { store, groupId } = await fixture(t);
   const rpc = createGroupHistoryRpcHandler(store);
   assert.equal((await rpc(GROUP_HISTORY_ENDPOINTS.set, { groupHistoryRetentionDays: 3 })).value.groupHistoryRetentionDays, 3);
-  assert.equal((await rpc(GROUP_HISTORY_ENDPOINTS.enable, { groupId, enabled: true })).ok, true);
+  assert.equal((await rpc('settings.group-history.enable', { groupId, enabled: false })).ok, false);
   assert.equal((await rpc(GROUP_HISTORY_ENDPOINTS.set, { groupHistoryRetentionDays: 0 })).ok, false);
   assert.equal((await rpc(GROUP_HISTORY_ENDPOINTS.get, { groupId })).ok, false);
 });

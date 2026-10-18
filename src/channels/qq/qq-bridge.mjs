@@ -531,7 +531,7 @@ export class QqHarnessBridge {
       text: message.raw?.content ?? message.content ?? '',
       type: message.attachments?.length ? 'file' : 'text',
       capability: '仅保存实际投递的消息；未 @ 能力及跨应用群身份尚需验证，当前按应用来源隔离。',
-    }, { accessPolicy: this.#accessPolicy, logger: this.#logger })
+    }, { logger: this.#logger })
       .then(() => { message.groupHistory = normalized.groupHistory; return this.#accept(message); });
   }
 

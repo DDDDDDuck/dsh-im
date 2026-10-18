@@ -1,5 +1,3 @@
-import { evaluateInboundAccess } from './inbound-access.mjs';
-
 export function groupHistoryAttachments(message) {
   const attachments = [];
   for (const [type, sources] of [['image', message?.images], ['file', message?.files]]) {
@@ -40,20 +38,15 @@ export function groupHistoryEntry(channel, raw, message, { scope = '', groupName
   return null;
 }
 
-/** Capture before the response gate, but discover new groups only from authorized addressed requests. */
-export async function captureGroupHistory(store, message, entry, { accessPolicy, allowed = true, logger = console } = {}) {
+/** Record received groups before the response gate, without requiring a mention or an AI session. */
+export async function captureGroupHistory(store, message, entry, { logger = console } = {}) {
   if (!store || !entry || message?.kind !== 'group') return message;
   try {
-    const discover = message.addressed === true && message.senderIsBot !== true && allowed
-      && (!accessPolicy || evaluateInboundAccess(accessPolicy, {
-        conversationType: 'group', senderIds: [message.senderId, message.senderAlternateId].filter(Boolean),
-        text: message.content ?? '', hasImages: !!message.images?.length, hasFiles: !!message.files?.length,
-      }).allowed);
     const context = await store.capture({ ...entry,
       senderId: entry.senderId ?? message.senderId,
       text: entry.text ?? message.content ?? '',
       attachments: entry.attachments ?? groupHistoryAttachments(message),
-    }, { discover });
+    });
     // A context is a live service reference, not a model-controlled group selector.
     if (context) message.groupHistory = context;
   } catch (error) {

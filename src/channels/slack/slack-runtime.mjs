@@ -672,7 +672,7 @@ export class SlackRuntime {
         if (message && bridge) {
           void captureGroupHistory(this.#groupHistory, message, groupHistoryEntry('slack', packet.payload, message, {
             scope: this.#config.platformId.split(':')[0],
-          }), { accessPolicy: this.#accessPolicy, logger: this.#logger })
+          }), { logger: this.#logger })
             .then(() => bridge.accept(message)).catch((error) => {
             if (generation !== this.#generation || this.#stopped) return;
             this.#logger.error?.(

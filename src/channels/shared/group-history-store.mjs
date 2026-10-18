@@ -87,7 +87,7 @@ export class GroupHistoryStore {
     this.#db.exec(`PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 3000;
       CREATE TABLE IF NOT EXISTS groups (
         id TEXT PRIMARY KEY, channel TEXT NOT NULL, platform_scope TEXT NOT NULL DEFAULT '',
-        platform_group_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', enabled INTEGER NOT NULL DEFAULT 0,
+        platform_group_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',
         recording_started_at INTEGER, last_received_at INTEGER, capability TEXT NOT NULL DEFAULT '',
         UNIQUE(channel, platform_scope, platform_group_id));
       CREATE TABLE IF NOT EXISTS messages (
@@ -155,28 +155,7 @@ export class GroupHistoryStore {
     return write;
   }
 
-  async groups() {
-    await this.ready();
-    return this.#db.prepare(`SELECT g.*, (SELECT count(*) FROM messages m WHERE m.group_id = g.id AND m.sent_at >= ?) AS message_count
-      FROM groups g ORDER BY g.channel, g.name, g.id`).all(this.cutoff()).map((row) => ({
-      id: row.id, channel: row.channel, name: row.name || row.platform_group_id,
-      platformGroupId: row.platform_group_id, enabled: row.enabled === 1,
-      recordingStartedAt: row.recording_started_at, lastReceivedAt: row.last_received_at,
-      messageCount: row.message_count, capability: row.capability,
-    }));
-  }
-
-  async setEnabled(groupId, enabled) {
-    await this.ready();
-    if (typeof enabled !== 'boolean') throw invalid('群采集开关无效。');
-    const result = this.#db.prepare(`UPDATE groups SET enabled = ?, recording_started_at =
-      CASE WHEN ? = 1 THEN coalesce(recording_started_at, ?) ELSE recording_started_at END WHERE id = ?`)
-      .run(Number(enabled), Number(enabled), this.#now(), groupId);
-    if (!result.changes) throw invalid('群不存在，请先在群内 @ 机器人。');
-    return { groupId, enabled };
-  }
-
-  async capture(entry, { discover = false } = {}) {
+  async capture(entry) {
     await this.ready();
     if (this.#closing || !entry || !GROUP_HISTORY_CHANNELS.includes(entry.channel)) return null;
     const platformGroupId = text(entry.groupId);
@@ -184,7 +163,6 @@ export class GroupHistoryStore {
     const scope = text(entry.scope);
     let group = this.#db.prepare('SELECT * FROM groups WHERE channel = ? AND platform_scope = ? AND platform_group_id = ?')
       .get(entry.channel, scope, platformGroupId);
-    if (!group && !discover) return null;
     if (!group) {
       const id = randomUUID();
       this.#db.prepare('INSERT INTO groups(id, channel, platform_scope, platform_group_id, name, capability) VALUES(?,?,?,?,?,?)')
@@ -195,7 +173,9 @@ export class GroupHistoryStore {
         .run(text(entry.groupName) || group.name, text(entry.capability, 1000) || group.capability, group.id);
     }
     const context = Object.freeze({ store: this, groupId: group.id });
-    if (!group.enabled || this.#settingsError) return context;
+    // Older databases may retain an enabled column. It no longer gates
+    // recording: every group delivered by the platform is recorded by default.
+    if (this.#settingsError) return context;
     const messageId = text(entry.messageId, 2048);
     if (!messageId || !entry.senderId) return context;
     const now = this.#now();
@@ -221,7 +201,8 @@ export class GroupHistoryStore {
           queued.push({ attachment, source, groupId: group.id, messageId: message.id });
         }
       }
-      this.#db.prepare('UPDATE groups SET last_received_at = ? WHERE id = ?').run(now, group.id);
+      this.#db.prepare('UPDATE groups SET last_received_at = ?, recording_started_at = coalesce(recording_started_at, ?) WHERE id = ?')
+        .run(now, now, group.id);
       this.#db.exec('COMMIT');
     } catch (error) { this.#db.exec('ROLLBACK'); throw error; }
     for (const job of queued) this.#jobs.set(job.attachment.id, job);
@@ -336,7 +317,7 @@ export class GroupHistoryStore {
     return { groupName: group.name || group.platform_group_id, retentionDays: this.#days,
       recordingStartedAt: group.recording_started_at, from: lower, to: upper, items,
       nextCursor: last && rows.length > items.length ? Buffer.from(JSON.stringify({ groupId, kind, time: last.sent_at, id: last.id })).toString('base64url') : null,
-      coverage: 'Only messages actually received while recording was enabled; not complete platform history.' };
+      coverage: 'Only messages actually received by this plugin; not complete platform history.' };
   }
 
   async materialize(groupId, attachmentId, workspace) {

@@ -13,15 +13,10 @@ const EN = Object.freeze({
   '保持本页打开，等待权限生效': 'Keep this page open while the permission takes effect',
   "群聊天记录": "Group chat history",
   "群聊天记录保留天数": "Group chat retention (days)",
-  "按群共享聊天记录及其附件，默认保留最近 14 天。修改后对所有启用采集的群生效。": "Share messages and attachments within each group. Keep the last 14 days by default. Changes apply to all groups with recording enabled.",
+  "自动保存实际收到的群消息及其附件，按群共享，默认保留最近 14 天。修改后对所有群生效。": "Automatically save received group messages and attachments, shared within each group. Keep the last 14 days by default. Changes apply to all groups.",
   "保留天数": "Retention days",
   "天": "days",
   "缩短保留天数会清理过期记录及其群文件；调大天数不会恢复已删除内容。会话中已有的副本按原有规则保留。": "Reducing retention removes expired messages and group files. Increasing it cannot restore deleted data. Existing session copies follow their own retention settings.",
-  "群记录采集": "Group recording",
-  "先在目标群内 @ 机器人，再刷新列表并开启采集。开启后保存实际收到的普通消息和文件，不改变机器人的回复方式。": "Mention the bot in the target group, then refresh this list and enable recording. Received messages and files are saved without changing when the bot replies.",
-  "暂无已发现的群": "No groups discovered yet",
-  "开启采集": "Enable recording",
-  "已开启": "Enabled",
   "正在读取群记录设置…": "Loading group history settings…",
   "保留天数必须为正整数。": "Retention days must be a positive integer.",
   "无法读取或保存群记录设置，请稍后重试。": "Unable to read or save group history settings. Try again.",
@@ -588,7 +583,7 @@ const EN = Object.freeze({
   '正在申请 QQ 二维码…': 'Requesting QQ QR code…',
   '正在生成 WhatsApp 二维码': 'Generating WhatsApp QR code',
   '扫码，创建第一个飞书入口': 'Scan to create your first Feishu bot',
-  '扫码会新增一个机器人，并申请 im:message.group_msg（接收未 @ 的群消息）、im:message:readonly（读取消息中的图片或文件）等所需权限。新机器人默认仅 @ 时回复，群记录采集需另行开启；已接入的机器人继续正常收发消息。': 'Scanning creates a bot and requests the required permissions, including im:message.group_msg for group messages without mentions and im:message:readonly for images or files in messages. New bots reply only when mentioned by default; group recording must be enabled separately. Existing bots continue to work.',
+  '扫码会新增一个机器人，并申请 im:message.group_msg（接收未 @ 的群消息）、im:message:readonly（读取消息中的图片或文件）等所需权限。新机器人默认仅 @ 时回复，实际收到的群消息和文件会自动保存；已接入的机器人继续正常收发消息。': 'Scanning creates a bot and requests the required permissions, including im:message.group_msg for group messages without mentions and im:message:readonly for images or files in messages. New bots reply only when mentioned by default; received group messages and files are saved automatically. Existing bots continue to work.',
   '无需手动填写 App ID。以后还可以继续添加机器人，分别服务不同团队或飞书租户。': 'No App ID is required. You can add more bots later for different teams or Feishu tenants.',
   '使用飞书扫码创建机器人': 'Scan with Feishu to create a bot',
   '刷新二维码后继续': 'Refresh the QR code to continue',
@@ -608,7 +603,7 @@ const EN = Object.freeze({
   '权限配置已提交，正在启用全部消息模式并重连此机器人；此阶段无法取消，其他机器人不会中断。': 'The permission update was submitted. Enabling all-message mode and reconnecting this bot. This stage cannot be cancelled; other bots will not be interrupted.',
   '正在为现有飞书应用申请群消息权限二维码，请稍候。': 'Requesting a group-message permission QR code for the existing Feishu app…',
   '群消息权限没有开通完成': 'Group-message permission was not granted',
-  '扫码会更新现有飞书应用，增量补充当前缺少的卡片按钮回调、接收未 @ 群消息所需的 im:message.group_msg、读取用户消息内图片或文件所需的 im:message:readonly（飞书显示为“获取单聊、群组消息”）、上传机器人图片或文件所需的 im:resource、接收群内其他机器人 @ 当前机器人所需的 im:message.group_at_msg.include_bot:readonly，以及原生命令面板所需的 application:app_slash_command:read / write；不会创建新应用，也不会改变群回复方式或开启群记录采集。确认页只显示当前缺少项，完成后此机器人会短暂重连，其他机器人不受影响。': 'Scanning updates the existing Feishu app with the missing card-button callback, im:message.group_msg for group messages without mentions, im:message:readonly for reading images or files in user messages (shown by Feishu as “Read direct and group messages”), im:resource for uploading images or files sent by the bot, im:message.group_at_msg.include_bot:readonly for receiving group messages from other bots that mention this bot, and application:app_slash_command:read / write for the native command panel. It does not create a new app, change the group reply mode, or enable group recording. The confirmation page shows only missing items; this bot reconnects briefly afterward, while other bots are unaffected.',
+  '扫码会更新现有飞书应用，增量补充当前缺少的卡片按钮回调、接收未 @ 群消息所需的 im:message.group_msg、读取用户消息内图片或文件所需的 im:message:readonly（飞书显示为“获取单聊、群组消息”）、上传机器人图片或文件所需的 im:resource、接收群内其他机器人 @ 当前机器人所需的 im:message.group_at_msg.include_bot:readonly，以及原生命令面板所需的 application:app_slash_command:read / write；不会创建新应用，群回复方式保持不变，实际收到的群消息和文件会自动保存。确认页只显示当前缺少项，完成后此机器人会短暂重连，其他机器人不受影响。': 'Scanning updates the existing Feishu app with the missing card-button callback, im:message.group_msg for group messages without mentions, im:message:readonly for reading images or files in user messages (shown by Feishu as “Read direct and group messages”), im:resource for uploading images or files sent by the bot, im:message.group_at_msg.include_bot:readonly for receiving group messages from other bots that mention this bot, and application:app_slash_command:read / write for the native command panel. It does not create a new app or change the group reply mode. Received group messages and files are saved automatically. The confirmation page shows only missing items; this bot reconnects briefly afterward, while other bots are unaffected.',
   '核对现有应用名称，并确认只新增当前缺少的上述配置': 'Review the existing app name and confirm that only the missing items described above are added',
   '保持本页打开，等待权限与回调补全完成': 'Keep this page open until permissions and the callback are complete',
   '取消补全': 'Cancel setup',
@@ -619,7 +614,7 @@ const EN = Object.freeze({
   '权限与回调没有补全完成': 'Permissions and callback setup did not finish',
   '补全权限': 'Complete permissions',
   '补全范围': 'Completion scope',
-  '增量添加当前缺少的卡片回调 card.action.trigger、接收未 @ 群消息所需的 im:message.group_msg、读取消息内图片或文件所需的 im:message:readonly（飞书显示为“获取单聊、群组消息”）、上传机器人图片或文件所需的 im:resource，以及原生命令面板所需的 application:app_slash_command:read / write；确认页只显示当前缺少项，不会创建新应用，也不会改变群回复方式或开启群记录采集。': 'Adds the missing card callback card.action.trigger, im:message.group_msg for group messages without mentions, im:message:readonly for reading images or files in messages (shown by Feishu as “Read direct and group messages”), im:resource for uploading images or files sent by the bot, and application:app_slash_command:read / write for the native command panel. The confirmation page shows only missing items; no new app is created, and the group reply mode and recording settings stay unchanged.',
+  '增量添加当前缺少的卡片回调 card.action.trigger、接收未 @ 群消息所需的 im:message.group_msg、读取消息内图片或文件所需的 im:message:readonly（飞书显示为“获取单聊、群组消息”）、上传机器人图片或文件所需的 im:resource，以及原生命令面板所需的 application:app_slash_command:read / write；确认页只显示当前缺少项，不会创建新应用，群回复方式保持不变，实际收到的群消息和文件会自动保存。': 'Adds the missing card callback card.action.trigger, im:message.group_msg for group messages without mentions, im:message:readonly for reading images or files in messages (shown by Feishu as “Read direct and group messages”), im:resource for uploading images or files sent by the bot, and application:app_slash_command:read / write for the native command panel. The confirmation page shows only missing items; no new app is created, and the group reply mode stays unchanged. Received group messages and files are saved automatically.',
   '等待扫码…': 'Waiting for scan…',
   '飞书服务返回了不匹配的权限补全二维码': 'Feishu returned a permission-completion QR code for a different bot',
   '飞书服务返回了不匹配的群消息权限二维码': 'Feishu returned a group-message permission QR code for a different bot',
@@ -1214,10 +1209,6 @@ function channelName(value) {
 }
 
 function translateDynamic(text) {
-  const savedMessages = /^已保存消息：(.*)$/.exec(text);
-  if (savedMessages) return `Saved messages: ${savedMessages[1]}`;
-  const groupRecording = /^(.*)的群记录采集$/.exec(text);
-  if (groupRecording) return `Group recording for ${groupRecording[1]}`;
   const configMessage = /^微信配置格式错误：(config\.json|workspaces\.json)。请查看诊断详情，修复后重启 DSH。$/.exec(text);
   if (configMessage) return EN['微信配置格式错误：{file}。请查看诊断详情，修复后重启 DSH。'].replace('{file}', configMessage[1]);
   const configHint = /^(.*?)请检查微信渠道数据目录中的 (config\.json|workspaces\.json)，修复后重启 DSH；“重新读取”不会重新加载配置。\s*(字段位置中的序号从 0 开始，按文件中的条目顺序计数，不包含真实账号标识。)?$/.exec(text);

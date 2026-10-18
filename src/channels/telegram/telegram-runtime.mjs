@@ -1429,8 +1429,7 @@ export class TelegramRuntime {
         });
         if (message) {
           await captureGroupHistory(this.#groupHistory, message, groupHistoryEntry('telegram', update, message), {
-            accessPolicy: this.#accessPolicy,
-            allowed: !!this.#accessPolicy || telegramInboundAllowed(message, this.#config), logger: this.#logger,
+            logger: this.#logger,
           });
           void this.#bridge.accept(message, { contextSnapshot }).catch((error) => {
             if (signal.aborted) return;

@@ -870,7 +870,7 @@ export class DiscordRuntime {
     const preflight = normalizeDiscordMessage(message, this.#config.platformId);
     if (preflight) await captureGroupHistory(this.#groupHistory, preflight, groupHistoryEntry('discord', message, preflight, {
       groupName: this.#channels.get(String(message.channel_id))?.name,
-    }), { accessPolicy: this.#accessPolicy, logger: this.#logger });
+    }), { logger: this.#logger });
     let accessDecision;
     if (preflight?.kind === 'group' && preflight.addressed === true
       && preflight.senderIsBot !== true) {

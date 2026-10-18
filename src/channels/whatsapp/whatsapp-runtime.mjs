@@ -838,8 +838,7 @@ export class WhatsappRuntime {
           }
           if (!hasViewOnceWrapper(raw.message)) {
             await captureGroupHistory(this.#groupHistory, message, groupHistoryEntry('whatsapp', raw, message, { groupName }), {
-              accessPolicy: this.#accessPolicy,
-              allowed: !!this.#accessPolicy || whatsappInboundAllowed(message, this.#config), logger: this.#logger,
+              logger: this.#logger,
             });
           }
           this.#status.lastCheckedAt = Date.now();

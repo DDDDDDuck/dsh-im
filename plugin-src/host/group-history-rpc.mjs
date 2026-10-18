@@ -1,6 +1,5 @@
 export const GROUP_HISTORY_ENDPOINTS = Object.freeze({
   get: 'settings.group-history.get', set: 'settings.group-history.set',
-  groups: 'settings.group-history.groups', enable: 'settings.group-history.enable',
 });
 
 export function createGroupHistoryRpcHandler(store) {
@@ -12,10 +11,7 @@ export function createGroupHistoryRpcHandler(store) {
     try {
       let value;
       if (endpoint === GROUP_HISTORY_ENDPOINTS.get && keys === '') value = await store.settings();
-      else if (endpoint === GROUP_HISTORY_ENDPOINTS.groups && keys === '') value = { groups: await store.groups() };
       else if (endpoint === GROUP_HISTORY_ENDPOINTS.set && keys === 'groupHistoryRetentionDays') value = await store.setRetentionDays(payload.groupHistoryRetentionDays);
-      else if (endpoint === GROUP_HISTORY_ENDPOINTS.enable && keys === 'enabled,groupId'
-        && typeof payload.groupId === 'string' && typeof payload.enabled === 'boolean') value = await store.setEnabled(payload.groupId, payload.enabled);
       else throw new Error('群记录设置请求无效。');
       return { ok: true, value };
     } catch (error) {

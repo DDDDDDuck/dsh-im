@@ -1239,7 +1239,7 @@ export class MultiBotDshFeishuController {
         }
 
         // The SDK update includes group-message access. Persist that fact
-        // without changing the bot's response mode or any group recording switch.
+        // without changing the bot's response mode.
         record.stage = 'persisting_permissions';
         let saved;
         try {

@@ -665,11 +665,6 @@ const CSS = String.raw`
 .dim-generalSettingsTab[aria-selected="true"]::after { background: var(--dim-blue); transform: scaleX(1); }
 .dim-generalSettingsTab:focus-visible { outline: 2px solid var(--dim-blue); outline-offset: -2px; border-radius: 5px; }
 .dim-generalSettingsTabPanel { min-width: 0; padding-top: 14px; }
-.dim-groupHistoryList { display: grid; gap: 10px; margin-top: 12px; }
-.dim-groupHistoryRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 10px; }
-.dim-groupHistoryDetails { display: grid; gap: 4px; min-width: 0; }
-.dim-groupHistoryDetails small { color: var(--dsw-alias-label-secondary, #646a73); overflow-wrap: anywhere; }
-.dim-groupHistoryRow > button { flex: none; }
 .dim-groupHistorySettings > h3 { margin-top: 0; }
 
 .dim-globalSection { min-width: 0; padding: 14px 16px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 12px; background: var(--dsw-alias-bg-layer-3, #fff); }
