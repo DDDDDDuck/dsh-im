@@ -6,6 +6,31 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-10-18
+
+### Added / 新增
+
+- 新增 WhatsApp、飞书、Telegram、Discord、Slack、QQ 群消息与附件本地归档，保存实际收到的普通群消息，无需先 @ 机器人；采集本身不调用模型或创建 AI 会话，回复仍遵守原有触发规则与访问设置。群记录独立于机器人、会话和工作区，同一数据目录内按群身份共享；QQ 按应用来源隔离，Discord 线程与父频道分开。
+  Added local group-message and attachment archives for WhatsApp, Feishu, Telegram, Discord, Slack, and QQ, including ordinary received messages without a bot mention. Capture does not invoke the model or create AI Sessions, and replies retain existing trigger and access rules. Archives are independent of bots, Sessions, and workspaces and are shared by group identity within one data directory; QQ is application-scoped, while Discord threads are separate from parent channels.
+- 新增 `dsh_im_group_history` 与 `dsh_im_group_file` 工具，支持按时间、关键词分页查询当前群消息或文件列表，并读取文件的会话副本。读取权限绑定当前群的实际请求；私聊、Web/CLI、跨群及已结束的请求不能继承群记录权限。
+  Added `dsh_im_group_history` and `dsh_im_group_file` tools for paginated time/keyword searches and session copies of archived files. Access is bound to a live request originating from the current group; direct chats, Web/CLI inputs, other groups, and ended requests cannot inherit archive access.
+- 通用设置新增全局群聊天记录保留天数，默认 14 天，支持正整数并即时生效；按消息时间滚动保留，查询排除过期数据，启动、每小时及修改设置后清理过期消息与文件。新增中英文群记录设置和使用指南。
+  Added a global group-history retention setting, defaulting to 14 days and accepting positive integers with immediate effect. Retention rolls from message timestamps, queries exclude expired data, and startup, hourly, and settings-change sweeps clean up expired messages and files. Added Chinese and English setup and usage guides.
+
+### Changed / 变更
+
+- 飞书扫码新增与补全权限流程申请群普通消息和消息附件读取权限；Slack 应用模板补充普通频道消息订阅。已有应用仍需按平台要求补齐权限或重新授权，详见 [群记录指南](docs/group-history.md)。
+  Feishu onboarding and permission repair request ordinary group-message and message-resource access; the Slack app manifest adds ordinary channel-message subscriptions. Existing apps still require platform-side permissions or reauthorization as described in the [group-history guide](docs/group-history.en.md).
+
+### Notes / 使用说明
+
+- 群记录默认自动采集，无逐群开关；仅保存平台实际投递的消息与可下载附件，不回填接入前完整历史，也不保证补齐离线消息、编辑或撤回。归档单文件上限 100 MiB，仍受平台更低限制约束。请在升级前确认群成员知情及所需平台权限。
+  Group recording is automatic by default, without per-group switches. Only actually delivered messages and downloadable attachments are saved; full pre-connection history, offline gaps, edits, and deletions are not guaranteed. The archive limit is 100 MiB per file, subject to lower platform limits. Ensure group members are informed and required platform permissions are configured before upgrading.
+- 缩短保留期限会清理过期原始记录；延长期限不能恢复已删除内容。AI 会话中的文字、总结和文件副本按各自规则保留，不随群记录期限同步清除。Telegram 文件及 Discord、Slack 真实群验收尚未完成，不将已实现采集路径等同于全平台实测通过。
+  Shortening retention removes expired archive originals; extending it cannot restore deleted data. Text, summaries, and file copies already in AI Sessions follow their own retention rules. Live validation of Telegram files and Discord/Slack groups remains outstanding; implemented capture paths do not imply all platforms have passed live acceptance tests.
+- npm 依赖、Node.js 要求与 DSH 兼容声明保持不变。升级后重启 Host 并刷新管理页面，以加载同版 Host 和客户端代码。
+  npm dependencies, Node.js requirements, and DSH compatibility declarations are unchanged. Restart the Host and refresh the management page after upgrading to load matching Host and client code.
+
 ## [5.0.3] - 2026-10-18
 
 ### Fixed / 修复
