@@ -6,10 +6,21 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+## [5.0.3] - 2026-10-18
+
 ### Fixed / 修复
 
 - WhatsApp 群聊仅在被 @ 或回复机器人实际发出的消息时触发，绑定账号本人的普通发言及对其手动消息的回复不再唤醒机器人；自聊保持正常。机器人群消息 ID 随现有状态保存，重启后仍可识别。
   WhatsApp groups now respond only to mentions or replies to messages actually sent by the bot. Ordinary messages from the linked account and replies to its manual messages no longer trigger the bot; self-chat is unchanged. Bot group-message IDs are persisted across restarts.
+- 修复临时文件快照目录被系统清理后，后续结果文件发送持续失败的问题：自动重建私有目录并重试一次；初次目录创建失败不再永久缓存失败结果，错误保留底层原因，取消请求不会继续重试。
+  Fixed subsequent result-file sends failing after system cleanup removes the temporary snapshot directory. The private directory is recreated and copying is retried once; an initial directory-creation failure no longer stays cached permanently, underlying error causes are preserved, and cancelled requests are not retried.
+
+### Notes / 使用说明
+
+- WhatsApp 保存最近 2,000 条机器人群消息标识，按群区分并跨重启保留。升级前未记录或超出保留范围的旧消息不能用于回复唤醒，请 @ 机器人或回复其新消息；私聊和自聊保持原有行为。中英文说明已同步更新。
+  WhatsApp retains the latest 2,000 bot group-message identifiers, scoped to their groups and persisted across restarts. Replies to unrecorded pre-upgrade messages or older messages outside this history do not trigger the bot; mention it or reply to a new bot message instead. Direct and self-chat behavior is unchanged, and both READMEs are updated.
+- 依赖与 DSH 兼容声明保持不变。升级后重启 Host 并刷新管理页面，以加载同版 Host 和客户端代码。
+  Dependency and DSH compatibility declarations remain unchanged. Restart the Host and refresh the management page after upgrading so Host and client code use the same version.
 
 ## [5.0.2] - 2026-10-18
 
@@ -1836,7 +1847,8 @@ Thanks to [@Dong09](https://github.com/Dong09) for the Matrix conversation-conte
 - 改进 npm 发布包结构，保留 CLI 入口并避免安装脚本拦截。
   Improved npm package contents to preserve the CLI entry point and avoid install-script blocking.
 
-[Unreleased]: https://github.com/xmanrui/dsh-im/compare/v5.0.2...HEAD
+[Unreleased]: https://github.com/xmanrui/dsh-im/compare/v5.0.3...HEAD
+[5.0.3]: https://github.com/xmanrui/dsh-im/compare/v5.0.2...v5.0.3
 [5.0.2]: https://github.com/xmanrui/dsh-im/compare/v5.0.1...v5.0.2
 [5.0.1]: https://github.com/xmanrui/dsh-im/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/xmanrui/dsh-im/compare/v4.39.0...v5.0.0
