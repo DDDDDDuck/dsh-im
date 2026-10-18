@@ -45,7 +45,7 @@ export function installImPluginPage(ctx, { packageName, renderPanel, iconUrl }) 
       const stopSidebar = pageCtx.slots.inject('sidebar.panellist', () =>
         pageCtx.slots.register({
           name: 'sidebar.panellist', id: IM_MAIN_PANEL_ID,
-          order: 30, label: () => pageCtx.locale.bind(IM_LOCALE_NAMESPACE)('IM机器人'),
+          order: 10, label: () => pageCtx.locale.bind(IM_LOCALE_NAMESPACE)('IM机器人'),
           locale: IM_LOCALE_NAMESPACE, inject: () => ({ iconUrl }),
         }, ImSidebarIcon));
       const stopActions = pageCtx.slots.inject('plugins.detail.actions', () =>
