@@ -203,7 +203,7 @@ See the [Proactive Delivery Guide](PROACTIVE_DELIVERY.en.md) ([简体中文](PRO
 
 ### Client panel integration
 
-DSH versions supporting global panels show **IM bots** in the left sidebar, using a monochrome silhouette of the plugin catalog artwork to open the full management panel. Settings → IM bots and the plugin detail page's Open IM bots action remain available. Shells can also embed the panel through the optional `dshImClient` service. See the [client integration guide](docs/client-integration.md) for the contract, compatibility requirements and lifecycle example.
+DSH versions supporting global panels show **IM bots** in the left sidebar, using a thin monochrome outline of the catalog's linked speech bubbles to open the full management panel. Settings → IM bots and the plugin detail page's Open IM bots action remain available. Shells can also embed the panel through the optional `dshImClient` service. See the [client integration guide](docs/client-integration.md) for the contract, compatibility requirements and lifecycle example.
 
 ### Context enhancement
 

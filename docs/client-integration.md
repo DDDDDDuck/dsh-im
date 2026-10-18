@@ -8,9 +8,9 @@ The optional `dshImClient` service exposes the existing IM management panel to a
 
 On DSH versions with plugin detail actions, **Open IM bots** opens the same management panel in the main area, with **Back to plugin details** returning to this plugin. This entry uses the optional `layout` and `pluginNavigation` services and the `plugins.detail.actions` slot. Older DSH versions retain the Settings entry.
 
-支持 `sidebar.panellist` 的宿主同时提供左侧「IM机器人」入口，与插件详情操作共用同一个 `main` 面板。侧栏以插件页原图的透明轮廓配合 `currentColor` 显示单色图标，跟随侧栏颜色与图标尺寸；插件页仍使用原彩色图标。此入口不调用 `setSettingsVisible()`，设置入口和插件详情操作均保留。侧栏槽位消失时只移除侧栏入口，主面板或依赖服务退出时清理全部对应注册。
+支持 `sidebar.panellist` 的宿主同时提供左侧「IM机器人」入口，与插件详情操作共用同一个 `main` 面板。侧栏沿用插件页的双对话框造型，在 16×16 矢量画布上使用与宿主普通图标一致的 1px 描边，通过 `currentColor` 跟随侧栏颜色和传入尺寸；插件页仍使用原彩色图标。此入口不调用 `setSettingsVisible()`，设置入口和插件详情操作均保留。侧栏槽位消失时只移除侧栏入口，主面板或依赖服务退出时清理全部对应注册。
 
-Hosts with `sidebar.panellist` also show **IM bots** in the left sidebar, targeting the same `main` panel as the detail action. The sidebar masks the catalog artwork with `currentColor` at the host's icon size; the catalog keeps its original color image. This entry does not call `setSettingsVisible()`: both existing entry points remain available. Sidebar withdrawal removes only its entry, while main-slot or navigation-service withdrawal cleans up all related registrations.
+Hosts with `sidebar.panellist` also show **IM bots** in the left sidebar, targeting the same `main` panel as the detail action. The sidebar retains the catalog's linked speech bubbles as a 16×16 vector with the host's regular 1px stroke, using `currentColor` and the requested icon size; the catalog keeps its original color image. This entry does not call `setSettingsVisible()`: both existing entry points remain available. Sidebar withdrawal removes only its entry, while main-slot or navigation-service withdrawal cleans up all related registrations.
 
 ```ts
 interface DshImClient {

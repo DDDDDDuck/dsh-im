@@ -21,17 +21,20 @@ function ImPluginPage({ renderPanel, onBack, t }) {
       renderPanel()));
 }
 
-function ImSidebarIcon({ size, iconUrl }) {
-  return h('span', {
-    className: 'dim-sidebarIcon', 'aria-hidden': true,
-    style: { width: size, height: size, maskImage: `url("${iconUrl}")`,
-      WebkitMaskImage: `url("${iconUrl}")` },
-  });
+// Preserve the catalog's linked speech bubbles at the host's regular 1px weight.
+function ImSidebarIcon({ size }) {
+  return h('svg', {
+    className: 'dim-sidebarIcon', 'aria-hidden': true, focusable: false,
+    width: size, height: size, viewBox: '0 0 16 16', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 1, strokeLinecap: 'round', strokeLinejoin: 'round',
+  },
+  h('path', { d: 'M5 9.5H3.8L1.5 10.7l.7-2.2A2.4 2.4 0 0 1 1.5 6.8V4A2.5 2.5 0 0 1 4 1.5h4A2.5 2.5 0 0 1 10.5 4v3A2.5 2.5 0 0 1 8 9.5h-.5' }),
+  h('path', { d: 'M12 6.5A2.5 2.5 0 0 1 14.5 9v2.8a2.4 2.4 0 0 1-.7 1.7l.7 1.2-2.3-.7H8A2.5 2.5 0 0 1 5.5 11.5V9A2.5 2.5 0 0 1 8 6.5h.5' }));
 }
 
 // Optional services and slots keep the existing settings entry working on
 // older DSH versions. Reuse the same panel through public navigation APIs.
-export function installImPluginPage(ctx, { packageName, renderPanel, iconUrl }) {
+export function installImPluginPage(ctx, { packageName, renderPanel }) {
   if (typeof ctx.inject !== 'function') return;
   ctx.inject(['layout', 'pluginNavigation'], (pageCtx) =>
     pageCtx.slots.inject('main', () => {
@@ -46,7 +49,7 @@ export function installImPluginPage(ctx, { packageName, renderPanel, iconUrl }) 
         pageCtx.slots.register({
           name: 'sidebar.panellist', id: IM_MAIN_PANEL_ID,
           order: 10, label: () => pageCtx.locale.bind(IM_LOCALE_NAMESPACE)('IM机器人'),
-          locale: IM_LOCALE_NAMESPACE, inject: () => ({ iconUrl }),
+          locale: IM_LOCALE_NAMESPACE,
         }, ImSidebarIcon));
       const stopActions = pageCtx.slots.inject('plugins.detail.actions', () =>
         pageCtx.slots.register({

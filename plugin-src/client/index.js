@@ -570,7 +570,6 @@ export function apply(ctx) {
   installImPluginPage(ctx, {
     packageName: manifest.name,
     renderPanel: buildPanelElement,
-    iconUrl: process.env.DSH_IM_PLUGIN_ICON,
   });
 
   ctx.effect(() => {

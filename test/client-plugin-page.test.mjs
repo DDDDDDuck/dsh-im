@@ -56,7 +56,6 @@ async function start(t, { ready = true } = {}) {
     apply(ctx) {
       installImPluginPage(ctx, {
         packageName,
-        iconUrl: 'data:image/webp;base64,plugin-artwork',
         renderPanel: () => { renders++; return React.createElement('p', null, 'Shared IM panel'); },
       });
     },
@@ -87,7 +86,7 @@ async function start(t, { ready = true } = {}) {
       const { options, component } = slots.entries.get(name);
       assert.equal(options.locale, 'dsh-im');
       return React.createElement(component, {
-        ...options.inject(), ...props,
+        ...options.inject?.(), ...props,
         t: (key) => language === 'en' ? en[key] : key,
       });
     },
@@ -135,7 +134,7 @@ test('the action is limited to dsh-im bundle and component details', async (t) =
   assert.equal(renderer.root.findAllByType('button').length, 1);
 });
 
-test('sidebar opens the existing main panel and reuses the catalog artwork at the requested size', async (t) => {
+test('sidebar opens the existing main panel with a regular-weight linked-bubble icon at the requested size', async (t) => {
   const host = await start(t);
   await host.provideNavigation();
   const { options } = host.slots.entries.get('sidebar.panellist');
@@ -146,11 +145,12 @@ test('sidebar opens the existing main panel and reuses the catalog artwork at th
   t.after(() => act(() => renderer?.unmount()));
   for (const size of [16, 18]) {
     act(() => { renderer = create(host.element('sidebar.panellist', { size })); });
-    const icon = renderer.root.findByType('span');
+    const icon = renderer.root.findByType('svg');
     assert.equal(icon.props['aria-hidden'], true);
-    assert.equal(icon.props.style.width, size);
-    assert.equal(icon.props.style.height, size);
-    assert.equal(icon.props.style.maskImage, 'url("data:image/webp;base64,plugin-artwork")');
+    assert.equal(icon.props.width, size);
+    assert.equal(icon.props.height, size);
+    assert.equal(icon.props.stroke, 'currentColor');
+    assert.equal(icon.props.strokeWidth, 1);
     act(() => renderer.unmount());
   }
   assert.equal(host.renders, 0, 'the sidebar must not mount a second management panel');
