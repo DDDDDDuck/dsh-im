@@ -40,10 +40,11 @@ export class GroupHistoryAccessRegistry {
     if (event?.type === 'turn/start') this.#turns.set(id, { turn: event.data?.turn, keys: new Set(), denied: false });
     if (event?.type === 'user/message') {
       const source = event.data?.source;
-      // Host snapshots share the user/message event type but are not new
+      // Host snapshots/catalogs share the user/message event type but are not new
       // requests. Only the real inbox input can grant/change archive scope.
       if (['runtime-context', 'time-context', 'plugin:dsh-im'].includes(source?.kind)
         && ['snapshot', 'notice'].includes(source?.form)) return;
+      if (source?.kind === 'skill-catalog' && source?.form === 'catalog') return;
       const turn = this.#turns.get(id)?.turn ?? this.#activeTurn(session);
       this.claim(session, event.data, turn);
     }

@@ -201,6 +201,40 @@ test('host-bound access rejects invented, ended, Web, mixed-group and switched-s
   assert.equal(cleaned, true); assert.equal(registry.resolve(session), null);
 });
 
+test('Host skill catalogs preserve group access without granting access to other inputs', async () => {
+  const registry = new GroupHistoryAccessRegistry();
+  const store = { query: async (groupId) => ({ groupId }) };
+  const session = { id: 'feishu-session', events: [] };
+  const observe = (type, data) => {
+    const event = { type, data };
+    session.events.push(event);
+    registry.observe(session, event);
+  };
+  const [history] = createGroupHistoryTools(registry);
+  const exec = { agent: { session } };
+  const close = registry.open(session.id, 'feishu-rpc', { store, groupId: 'feishu-group' });
+  observe('turn/start', { turn: 1 });
+  observe('user/message', { source: { kind: 'user', rpcId: 'feishu-rpc' } });
+  observe('user/message', { source: { kind: 'plugin:dsh-im', form: 'notice' } });
+  observe('user/message', { source: { kind: 'runtime-context', form: 'snapshot' } });
+  assert.deepEqual(await history.execute({}, exec), { groupId: 'feishu-group' });
+  observe('user/message', { source: { kind: 'skill-catalog', form: 'catalog', entries: [] } });
+  observe('user/message', { source: { kind: 'time-context', form: 'snapshot' } });
+  assert.deepEqual(await history.execute({}, exec), { groupId: 'feishu-group' });
+  observe('user/message', { source: { kind: 'user', form: 'catalog', rpcId: 'web-rpc' } });
+  assert.throws(() => history.execute({}, exec), /authorized request/);
+  observe('turn/end', { turn: 1 });
+  observe('turn/start', { turn: 2 });
+  observe('user/message', { source: { kind: 'skill-catalog', form: 'catalog', entries: [] } });
+  assert.throws(() => history.execute({}, exec), /authorized request/);
+  observe('turn/end', { turn: 2 });
+  observe('turn/start', { turn: 3 });
+  observe('user/message', { source: { kind: 'user', rpcId: 'feishu-rpc' } });
+  observe('user/message', { source: { kind: 'skill-catalog', form: 'message' } });
+  assert.throws(() => history.execute({}, exec), /authorized request/);
+  close();
+});
+
 test('settings RPC rejects unknown parameters and persists valid retention', async (t) => {
   const { store, groupId } = await fixture(t);
   const rpc = createGroupHistoryRpcHandler(store);
