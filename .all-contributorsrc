@@ -151,6 +151,22 @@
       ]
     },
     {
+      "login": "chentianhai4",
+      "name": "chentianhai4",
+      "avatar_url": "https://avatars.githubusercontent.com/u/181718696",
+      "profile": "https://github.com/chentianhai4",
+      "contributions": [
+        {
+          "type": "code",
+          "url": "https://github.com/xmanrui/dsh-im/pull/392"
+        },
+        {
+          "type": "test",
+          "url": "https://github.com/xmanrui/dsh-im/pull/392"
+        }
+      ]
+    },
+    {
       "login": "cherryFloris",
       "name": "cherryFloris",
       "avatar_url": "https://avatars.githubusercontent.com/u/79453414",
