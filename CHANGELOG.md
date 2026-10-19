@@ -6,6 +6,29 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-10-20
+
+### Added / 新增
+
+- 支持 `sidebar.panellist` 的 DSH 宿主新增左侧「IM机器人」入口，与插件详情操作共用主区域管理面板；保留原设置入口和返回插件详情操作，无需安装独立桌面接入。侧栏使用跟随主题颜色及尺寸的单色双对话框图标，顺序设为 10，并在槽位或依赖服务退出时清理对应注册；旧宿主继续使用原设置入口。
+  Added an IM bots sidebar entry on DSH hosts supporting `sidebar.panellist`, opening the same main-area management panel as the plugin detail action. Settings and Back to plugin details remain available without installing the separate desktop integration. The sidebar uses a theme-colored, size-aware monochrome speech-bubble icon with order 10 and cleans up registrations when slots or required services disappear; older hosts retain Settings access.
+
+### Fixed / 修复
+
+- 微信文本回复遇到连接级 `network-error` 时，分别等待 400 ms、1,200 ms 后重试，最多尝试三次，同一文本块复用 `client_id`；超时、HTTP 错误和业务拒绝不自动重试，取消后停止后续尝试。感谢 [@chentianhai4](https://github.com/chentianhai4) 的贡献（[#392](https://github.com/xmanrui/dsh-im/pull/392)）。
+  Weixin text replies retry connection-level `network-error` failures after 400 ms and 1,200 ms, for up to three attempts with the same `client_id` per chunk. Timeouts, HTTP errors, and provider rejections are not retried, and cancellation stops further attempts. Thanks to [@chentianhai4](https://github.com/chentianhai4) for [#392](https://github.com/xmanrui/dsh-im/pull/392).
+- 企业微信 SDK 的警告与错误现写入渠道日志；共享进度更新失败日志可识别原始回执中的 `errcode` / `errmsg`，不再仅输出 `undefined`。感谢 [@lysgithub0302](https://github.com/lysgithub0302) 的贡献（[#387](https://github.com/xmanrui/dsh-im/pull/387)）。
+  WeCom SDK warnings and errors are now surfaced in channel logs. Shared progress-update failure logging extracts `errcode` / `errmsg` from raw acknowledgment frames instead of only printing `undefined`. Thanks to [@lysgithub0302](https://github.com/lysgithub0302) for [#387](https://github.com/xmanrui/dsh-im/pull/387).
+- 邮件投递重试回归测试改为等待实际重试完成，减少慢速 CI 下短轮询期限导致的误失败，并核对成功投递只执行一次且写入已处理状态。
+  The email delivery-retry regression now waits for the retry to complete instead of racing a short polling deadline on slow CI, and verifies single execution and persisted handled state.
+
+### Notes / 使用说明
+
+- 微信服务不保证按 `client_id` 去重：若请求已到达服务端但连接在响应前中断，重试仍可能产生重复消息。本次仅重试连接级错误，不承诺恰好一次投递。
+  Weixin does not guarantee deduplication by `client_id`: if a request reaches the service before the connection breaks, a retry may still duplicate the message. This change retries only connection-level failures and does not promise exactly-once delivery.
+- npm 依赖、Node.js 要求与 DSH 兼容声明保持不变。升级后重启 Host 并刷新管理页面，以加载同版 Host 和客户端代码。
+  npm dependencies, Node.js requirements, and DSH compatibility declarations are unchanged. Restart the Host and refresh the management page after upgrading to load matching Host and client code.
+
 ## [5.1.0] - 2026-10-18
 
 ### Added / 新增
