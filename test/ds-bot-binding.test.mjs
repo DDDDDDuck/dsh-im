@@ -7,7 +7,7 @@ import { createDsBotClient } from '../plugin-src/host/ds-bot-client.mjs';
 import { createDeliveryAdapter } from '../plugin-src/host/delivery-adapter.mjs';
 import { createDeliveryRpcHandler } from '../plugin-src/host/delivery-rpc.mjs';
 import { DeliveryService } from '../plugin-src/host/delivery-service.mjs';
-import { BotWorkspaceStore, createBotWorkspaceScope } from '../src/channels/shared/bot-workspace-store.mjs';
+import { BotWorkspaceStore, createBotWorkspaceScope, CURRENT_DOCUMENT_VERSION } from '../src/channels/shared/bot-workspace-store.mjs';
 import { ConversationStateStore } from '../src/channels/shared/conversation-state-store.mjs';
 import { askInWorkspaceSession } from '../src/channels/shared/workspace-session.mjs';
 import { privateDeliverySuggestionFromConversationKey } from '../plugin-src/host/delivery-suggestions.mjs';
@@ -202,6 +202,42 @@ test('missing DS Bot fails closed, while delivery target CRUD leaves bindings in
   assert.equal(f.workspaces.dsBotBindingFor('im-one', f.key), null);
 });
 
+test('bound bot and private chat cannot be selected again or overwritten, and unbinding releases both', async (t) => {
+  const f = await fixture(t);
+  const secondKey = 'c2c:user-two';
+  await f.state.setSession(secondKey, 'ordinary-two');
+  await f.service.bindDsBot('im-one', f.key, bot.id);
+  for (const [key, id] of [[f.key, bot.id], [f.key, 'ds-two'], [secondKey, bot.id]]) {
+    await assert.rejects(f.service.bindDsBot('im-one', key, id), { code: 'ds-bot-binding-conflict' });
+  }
+  assert.equal(f.state.sessionFor(f.key), bot.sessionId);
+  assert.equal(f.state.sessionFor(secondKey), 'ordinary-two');
+  await f.service.unbindDsBot('im-one', f.key);
+  assert.equal(f.state.sessionFor(f.key), null);
+  assert.equal(f.workspaces.listDsBotBindings('im-one').length, 0);
+  assert.equal((await f.adapter.listDsBotConversations('im-one')).some((entry) => entry.conversationKey === f.key && !entry.dsBotId), true);
+  const loaded = await new BotWorkspaceStore(f.path, { defaultWorkspace: f.dir }).load();
+  assert.deepEqual(loaded.dsBotConversationKeys('im-one'), [f.key]);
+  assert.equal(loaded.listDsBotBindings('im-one').length, 0);
+  await f.service.bindDsBot('im-one', f.key, bot.id);
+  assert.equal(f.workspaces.dsBotBindingFor('im-one', f.key).dsBotId, bot.id);
+});
+
+test('concurrent selection of the same bot commits once and restores the rejected chat mapping', async (t) => {
+  const f = await fixture(t);
+  const secondKey = 'c2c:user-two';
+  await f.state.setSession(secondKey, 'ordinary-two');
+  const results = await Promise.allSettled([
+    f.service.bindDsBot('im-one', f.key, bot.id),
+    f.service.bindDsBot('im-one', secondKey, bot.id),
+  ]);
+  assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
+  assert.equal(results.find((result) => result.status === 'rejected').reason.code, 'ds-bot-binding-conflict');
+  const [saved] = f.workspaces.listDsBotBindings('im-one');
+  const rejectedKey = saved.conversationKey === f.key ? secondKey : f.key;
+  assert.equal(f.state.sessionFor(rejectedKey), rejectedKey === f.key ? 'old-session' : 'ordinary-two');
+});
+
 const privateRoutes = [
   ['weixin', 'p2p:wx', { kind: 'user', route: { toUserId: 'wx' } }],
   ['feishu', 'p2p:ou_user', { kind: 'user', route: { openId: 'ou_user' } }],
@@ -224,12 +260,13 @@ for (const [channel, key, target] of privateRoutes) {
     assert.equal((await f.ask('hello')).sessionId, bot.sessionId);
     await f.service.unbindDsBot('im-one', f.key);
     await f.state.setSession(key.replace(/^[^:]+:/, 'group:'), 'group-session');
-    assert.deepEqual(await f.adapter.listDsBotConversations('im-one'), []);
-    await assert.rejects(f.service.bindDsBot('im-one', f.key, bot.id), { code: 'ds-bot-private-required' });
+    await f.workspaces.ensure('im-two');
+    assert.deepEqual(await f.adapter.listDsBotConversations('im-two'), []);
+    await assert.rejects(f.service.bindDsBot('im-two', f.key, bot.id), { code: 'ds-bot-private-required' });
   });
 }
 
-test('version 3 ordinary sync survives the version 4 binding migration and restart', async (t) => {
+test('version 3 ordinary sync survives the binding migration and restart', async (t) => {
   const f = await fixture(t);
   const saved = JSON.parse(await readFile(f.path, 'utf8'));
   saved.version = 3;
@@ -239,9 +276,23 @@ test('version 3 ordinary sync survives the version 4 binding migration and resta
   assert.equal(loaded.listSessionSyncTargets()[0].conversationKey, f.key);
   await loaded.setDsBotBinding('im-one', f.key, bot.id);
   assert.equal(loaded.listSessionSyncTargets()[0].conversationKey, f.key);
-  assert.equal(JSON.parse(await readFile(f.path, 'utf8')).version, 4);
+  assert.equal(JSON.parse(await readFile(f.path, 'utf8')).version, CURRENT_DOCUMENT_VERSION);
 });
 
+test('version 4 bindings remain intact when an unbound private chat is retained in version 5', async (t) => {
+  const f = await fixture(t);
+  const saved = JSON.parse(await readFile(f.path, 'utf8'));
+  saved.version = 4;
+  saved.dsBotBindings = { 'im-one': { [f.key]: bot.id } };
+  await writeFile(f.path, JSON.stringify(saved));
+  const loaded = await new BotWorkspaceStore(f.path, { defaultWorkspace: f.dir }).load();
+  assert.equal(loaded.dsBotBindingFor('im-one', f.key).dsBotId, bot.id);
+  await loaded.setDsBotBinding('im-one', f.key, null);
+  const restarted = await new BotWorkspaceStore(f.path, { defaultWorkspace: f.dir }).load();
+  assert.equal(restarted.dsBotBindingFor('im-one', f.key), null);
+  assert.deepEqual(restarted.dsBotConversationKeys('im-one'), [f.key]);
+  assert.equal(JSON.parse(await readFile(f.path, 'utf8')).version, CURRENT_DOCUMENT_VERSION);
+});
 test('RPC validates the binding payload; remote harness cannot bind a local DS Bot', async (t) => {
   const f = await fixture(t);
   const remote = new DeliveryService({ dsBot: f.dsBot, unavailableSessionSyncChannels: ['qq'] });

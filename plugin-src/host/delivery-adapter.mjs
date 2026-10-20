@@ -318,8 +318,7 @@ export function createDeliveryAdapter({ channel, workspaces, coreController, sta
     },
     async listDsBotConversations(botId) {
       const sessions = stateSessions(await stateFor(botId)) ?? {};
-      const bindings = workspaces.listDsBotBindings(botId);
-      const keys = new Set([...Object.keys(sessions), ...bindings.map((entry) => entry.conversationKey)]);
+      const keys = new Set([...Object.keys(sessions), ...workspaces.dsBotConversationKeys(botId)]);
       return [...keys].flatMap((conversationKey) => {
         const route = privateDeliverySuggestionFromConversationKey(channel, conversationKey);
         if (!route) return [];
@@ -335,7 +334,10 @@ export function createDeliveryAdapter({ channel, workspaces, coreController, sta
       }
       const state = await stateFor(botId);
       return withSessionBindingLock(state, conversationKey, async () => {
-        if (!state.sessionFor(conversationKey) && !workspaces.dsBotBindingFor(botId, conversationKey)) {
+        if (workspaces.listDsBotBindings(botId).some((binding) => (
+          binding.conversationKey === conversationKey || binding.dsBotId === dsBotId
+        ))) throw dsBotError('ds-bot-binding-conflict');
+        if (!state.sessionFor(conversationKey) && !workspaces.dsBotConversationKeys(botId).includes(conversationKey)) {
           throw dsBotError('ds-bot-private-required');
         }
         const bot = await dsBot.resolve(dsBotId);

@@ -41,7 +41,8 @@ import { configValidationError, withConfigResource } from './config-read-error.m
 
 const DELIVERY_DOCUMENT_VERSION = 2;
 const SESSION_SYNC_DOCUMENT_VERSION = 3;
-export const CURRENT_DOCUMENT_VERSION = 4;
+const DS_BOT_DOCUMENT_VERSION = 4;
+export const CURRENT_DOCUMENT_VERSION = 5;
 const EMPTY_DOCUMENT = Object.freeze({ version: 1, workspaces: Object.freeze({}) });
 
 function invalidWorkspaceConfig(field, issue) {
@@ -257,7 +258,7 @@ function normalizeDsBotBindings(value) {
       botIdOf(botId);
       if (!conversations || typeof conversations !== 'object' || Array.isArray(conversations)) throw new TypeError();
       bindings[botId] = Object.fromEntries(Object.entries(conversations).map(([key, dsBotId]) => (
-        [conversationKeyOf(key), botIdOf(dsBotId)]
+        [conversationKeyOf(key), dsBotId === null ? null : botIdOf(dsBotId)]
       )));
     }
   } catch {
@@ -268,7 +269,7 @@ function normalizeDsBotBindings(value) {
 
 function normalizeDocument(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return invalidWorkspaceConfig('$', 'expected-object');
-  if (![1, DELIVERY_DOCUMENT_VERSION, SESSION_SYNC_DOCUMENT_VERSION, CURRENT_DOCUMENT_VERSION].includes(value.version)) return invalidWorkspaceConfig('version', 'unsupported-version');
+  if (![1, DELIVERY_DOCUMENT_VERSION, SESSION_SYNC_DOCUMENT_VERSION, DS_BOT_DOCUMENT_VERSION, CURRENT_DOCUMENT_VERSION].includes(value.version)) return invalidWorkspaceConfig('version', 'unsupported-version');
   if (!value.workspaces || typeof value.workspaces !== 'object' || Array.isArray(value.workspaces)) return invalidWorkspaceConfig('workspaces', 'expected-object');
   const workspaces = {};
   for (const [index, [botId, workspace]] of Object.entries(value.workspaces).entries()) {
@@ -725,9 +726,14 @@ export class BotWorkspaceStore {
   listDsBotBindings(botId) {
     return Object.entries(this.#dsBotBindings).flatMap(([id, conversations]) => (
       this.has(id) && (botId === undefined || botId === id)
-        ? Object.entries(conversations).map(([conversationKey, dsBotId]) => ({ botId: id, conversationKey, dsBotId }))
+        ? Object.entries(conversations).filter(([, dsBotId]) => dsBotId !== null)
+          .map(([conversationKey, dsBotId]) => ({ botId: id, conversationKey, dsBotId }))
         : []
     ));
+  }
+
+  dsBotConversationKeys(botId) {
+    return this.has(botId) ? Object.keys(this.#dsBotBindings[botId] ?? {}) : [];
   }
 
   async setDsBotBinding(botId, conversationKey, dsBotId) {
@@ -737,8 +743,12 @@ export class BotWorkspaceStore {
     return this.#enqueue(id, async () => {
       if (!this.has(id)) throw deliveryTargetError('unknown-bot', 'Unknown bot');
       const conversations = { ...this.#dsBotBindings[id] };
-      if (selected === null) delete conversations[key];
-      else conversations[key] = selected;
+      if (selected !== null && (conversations[key] || Object.values(conversations).includes(selected))) {
+        throw deliveryTargetError('ds-bot-binding-conflict', 'DS Bot or private chat is already bound');
+      }
+      // Keep a confirmed private-chat key after unbinding so it can be selected
+      // again without keeping its old DS Bot session mapping alive.
+      conversations[key] = selected;
       const next = { ...this.#dsBotBindings, [id]: conversations };
       if (!Object.keys(conversations).length) delete next[id];
       await this.#persist(
