@@ -104,7 +104,7 @@ export function SidebarSettings({ rpcCall }) {
         h('div', { className: 'dim-botGeneralControl' },
           h('select', { id, className: 'dim-sidebarSelect', value: mode, disabled: phase !== 'ready', 'aria-describedby': `${id}-help`,
             onChange: (event) => { setMode(event.target.value); setSaved(false); } },
-          h('option', { value: 'auto' }, '自动（配置渠道后隐藏）'),
+          h('option', { value: 'auto' }, '自动隐藏'),
           h('option', { value: 'show' }, '始终显示'),
           h('option', { value: 'hide' }, '始终隐藏')),
           h('svg', { width: 16, height: 16, viewBox: '0 0 16 16', 'aria-hidden': true },

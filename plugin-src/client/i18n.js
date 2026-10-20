@@ -12,7 +12,7 @@ const EN = Object.freeze({
   '$locale': 'en',
   '侧边栏入口': 'Sidebar entry',
   '自动模式：未配置渠道时显示，配置至少一个渠道后隐藏。隐藏后仍可从插件详情或设置进入，不影响机器人后台运行。': 'Automatic: show before any channel is configured, then hide. Plugin details and Settings remain available; bots keep running in the background.',
-  '自动（配置渠道后隐藏）': 'Automatic (hide after setup)',
+  '自动隐藏': 'Auto-hide',
   '始终显示': 'Always show',
   '始终隐藏': 'Always hide',
   '正在读取侧边栏设置…': 'Loading sidebar settings…',
