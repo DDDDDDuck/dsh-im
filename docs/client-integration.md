@@ -4,9 +4,9 @@ dsh-im 发布可选客户端服务 `dshImClient`，供同一 DSH 客户端中的
 
 The optional `dshImClient` service exposes the existing IM management panel to a shell in the same DSH client. Settings → IM bots remains available by default. No migration or new configuration is required. The host-side `dshIm` delivery service is separate.
 
-支持插件详情操作按钮的 DSH 中，dsh-im 详情页提供「打开 IM机器人」按钮，在主区域打开同一管理面板；「返回插件详情」返回该插件。此入口依赖可选的 `layout`、`pluginNavigation` 服务及 `plugins.detail.actions` 槽位，旧版 DSH 仍可通过设置入口访问。
+支持插件详情操作按钮的 DSH 中，dsh-im 详情页提供「打开 IM机器人」按钮，在主区域打开同一管理面板。面板不显示返回按钮，通过宿主侧边栏切换面板。此入口依赖可选的 `layout` 服务及 `plugins.detail.actions` 槽位，旧版 DSH 仍可通过设置入口访问。
 
-On DSH versions with plugin detail actions, **Open IM bots** opens the same management panel in the main area, with **Back to plugin details** returning to this plugin. This entry uses the optional `layout` and `pluginNavigation` services and the `plugins.detail.actions` slot. Older DSH versions retain the Settings entry.
+On DSH versions with plugin detail actions, **Open IM bots** opens the same management panel in the main area. The panel has no back button; use the host sidebar to switch panels. This entry uses the optional `layout` service and the `plugins.detail.actions` slot. Older DSH versions retain the Settings entry.
 
 支持 `sidebar.panellist` 的宿主同时提供左侧「IM机器人」入口，与插件详情操作共用同一个 `main` 面板。侧栏沿用插件页的双对话框造型，在 16×16 矢量画布上使用与宿主普通图标一致的 1px 描边，通过 `currentColor` 跟随侧栏颜色和传入尺寸；插件页仍使用原彩色图标。此入口不调用 `setSettingsVisible()`，设置入口和插件详情操作均保留。侧栏槽位消失时只移除侧栏入口，主面板或依赖服务退出时清理全部对应注册。
 

@@ -48,7 +48,6 @@ async function start(t, { ready = true, sidebarVisible = true } = {}) {
   const root = new Context();
   const slots = slotLedger(ready);
   const selected = [];
-  const opened = [];
   let renders = 0;
   let visibility;
   root.provide('slots', slots);
@@ -70,7 +69,7 @@ async function start(t, { ready = true, sidebarVisible = true } = {}) {
   });
   await plugin.await();
   return {
-    slots, selected, opened, plugin,
+    slots, selected, plugin,
     setSidebarVisible: (value) => visibility.setSidebarVisible(value),
     get renders() { return renders; },
     async provideNavigation() {
@@ -78,7 +77,6 @@ async function start(t, { ready = true, sidebarVisible = true } = {}) {
         name: 'test-navigation',
         apply(ctx) {
           ctx.provide('layout', { selectPanel: (id) => selected.push(id) });
-          ctx.provide('pluginNavigation', { openBundle: (name) => opened.push(name) });
         },
       });
       providers.push(provider);
@@ -97,7 +95,7 @@ async function start(t, { ready = true, sidebarVisible = true } = {}) {
   };
 }
 
-test('detail action opens the shared IM panel and returns to this plugin in both languages', async (t) => {
+test('localized detail action opens the shared IM panel without a back button', async (t) => {
   const host = await start(t);
   await host.provideNavigation();
   assert.equal(host.renders, 0, 'registration must not mount the management panel');
@@ -115,10 +113,7 @@ test('detail action opens the shared IM panel and returns to this plugin in both
   act(() => renderer.update(host.element('main', {}, 'en')));
   assert.equal(host.renders, 1);
   assert.deepEqual(renderer.root.findByType('p').children, ['Shared IM panel']);
-  const back = renderer.root.findByType('button');
-  assert.equal(back.children.at(-1), 'Back to plugin details');
-  act(() => back.props.onClick());
-  assert.deepEqual(host.opened, [packageName]);
+  assert.equal(renderer.root.findAllByType('button').length, 0);
 });
 
 test('sidebar toggling preserves other entries and cancels pending registrations', async (t) => {
@@ -244,7 +239,6 @@ test('client startup waits for configuration before showing the sidebar', async 
     root.provide('locale', { register: () => () => {}, bind: () => (key) => key });
     root.provide('workspaces', {});
     root.provide('layout', { selectPanel() {} });
-    root.provide('pluginNavigation', { openBundle() {} });
     root.provide('connection', { rpc: { call: async (_path, _channel, { method, payload }) => {
       calls.push({ channel: _channel, method });
       if (method === 'settings.sidebar-entry.get') return new Promise((resolve) => { finishInitial = resolve; });
