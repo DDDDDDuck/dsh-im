@@ -228,35 +228,46 @@ test('slot withdrawal and plugin disposal cancel active registrations and pendin
   assert.equal(host.slots.waiting.size, 0);
 });
 
-test('client startup and a saved preference update the real sidebar while keeping other entries', async (t) => {
-  const root = new Context();
-  const slots = slotLedger(true);
-  let finishInitial;
-  root.provide('slots', slots);
-  root.provide('locale', { register: () => () => {}, bind: () => (key) => key });
-  root.provide('workspaces', {});
-  root.provide('layout', { selectPanel() {} });
-  root.provide('pluginNavigation', { openBundle() {} });
-  root.provide('connection', { rpc: { call: async (_path, _channel, { method, payload }) => {
-    if (method === 'settings.sidebar-entry.get') return new Promise((resolve) => { finishInitial = resolve; });
-    if (method === 'settings.sidebar-entry.set') return { ok: true, value: { mode: payload.mode, visible: payload.mode === 'show' } };
-    return { ok: true, value: {} };
-  } } });
-  const plugin = root.plugin({ name: 'test-client-sidebar', apply: applyClient });
-  t.after(() => plugin.dispose());
-  await plugin.await();
-  await flush();
-  assert.equal(slots.entries.size, 4, 'entry starts visible before Host configuration arrives');
-  finishInitial({ ok: true, value: { mode: 'auto', visible: false } });
-  await flush();
-  assert.equal(slots.entries.has('sidebar.panellist'), false);
-  assert.equal(slots.entries.size, 3);
-  const { globalSettingsRpcCall } = slots.entries.get('settings.section').options.inject();
-  await globalSettingsRpcCall('settings.sidebar-entry.set', { mode: 'show' });
-  assert.equal(slots.entries.size, 4);
-  await globalSettingsRpcCall('settings.sidebar-entry.set', { mode: 'hide' });
-  assert.equal(slots.entries.size, 3);
-  await plugin.dispose();
-  assert.equal(slots.entries.size, 0);
-  assert.equal(slots.waiting.size, 0);
+test('client startup waits for configuration before showing the sidebar', async (t) => {
+  for (const [scenario, initial, visible] of [
+    ['configured auto', { ok: true, value: { mode: 'auto', visible: false } }, false],
+    ['zero channels', { ok: true, value: { mode: 'auto', visible: true } }, true],
+    ['always show', { ok: true, value: { mode: 'show', visible: true } }, true],
+    ['always hide', { ok: true, value: { mode: 'hide', visible: false } }, false],
+    ['unavailable Host', { ok: false, error: { message: 'unavailable' } }, false],
+  ]) await t.test(scenario, async (t) => {
+    const root = new Context();
+    const slots = slotLedger(true);
+    let finishInitial;
+    root.provide('slots', slots);
+    root.provide('locale', { register: () => () => {}, bind: () => (key) => key });
+    root.provide('workspaces', {});
+    root.provide('layout', { selectPanel() {} });
+    root.provide('pluginNavigation', { openBundle() {} });
+    root.provide('connection', { rpc: { call: async (_path, _channel, { method, payload }) => {
+      if (method === 'settings.sidebar-entry.get') return new Promise((resolve) => { finishInitial = resolve; });
+      if (method === 'settings.sidebar-entry.set') return { ok: true, value: { mode: payload.mode, visible: payload.mode === 'show' } };
+      return { ok: true, value: {} };
+    } } });
+    const plugin = root.plugin({ name: 'test-client-sidebar', apply: applyClient });
+    t.after(() => plugin.dispose());
+    await plugin.await();
+    await flush();
+    assert.equal(slots.entries.size, 3, 'only main, plugin details and settings are registered while loading');
+    assert.equal(slots.entries.has('sidebar.panellist'), false);
+    assert.equal([...slots.waiting].some((item) => item.name === 'sidebar.panellist'), false,
+      'loading must not enqueue a sidebar registration that could flash when the slot arrives');
+    finishInitial(initial);
+    await flush();
+    assert.equal(slots.entries.has('sidebar.panellist'), visible);
+    assert.equal(slots.entries.size, visible ? 4 : 3);
+    const { globalSettingsRpcCall } = slots.entries.get('settings.section').options.inject();
+    await globalSettingsRpcCall('settings.sidebar-entry.set', { mode: 'show' });
+    assert.equal(slots.entries.size, 4);
+    await globalSettingsRpcCall('settings.sidebar-entry.set', { mode: 'hide' });
+    assert.equal(slots.entries.size, 3);
+    await plugin.dispose();
+    assert.equal(slots.entries.size, 0);
+    assert.equal(slots.waiting.size, 0);
+  });
 });

@@ -39,7 +39,8 @@ export function installSidebarVisibilitySync({ rpcCall, setVisible,
       const value = settingsResult(await rpcCall(SIDEBAR_SETTINGS_ENDPOINTS.get, {}, abort.signal));
       if (!abort.signal.aborted && current === revision && !pending) setVisible(value.visible);
     } catch {
-      // Keep the existing entry reachable when the Host is unavailable or old.
+      // Retain the last confirmed visibility (initially hidden) on failure.
+      // Settings and plugin details remain available independently.
     } finally {
       running = false;
       schedule(pending ? 0 : pollMs);

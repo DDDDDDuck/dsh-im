@@ -34,7 +34,9 @@ function ImSidebarIcon({ size }) {
 
 // Optional services and slots keep the existing settings entry working on
 // older DSH versions. Reuse the same panel through public navigation APIs.
-export function installImPluginPage(ctx, { packageName, renderPanel, sidebarVisible = true }) {
+export function installImPluginPage(ctx, { packageName, renderPanel, sidebarVisible = false }) {
+  // Wait for the Host's saved preference before adding a navigation row. An
+  // optimistic show would briefly shift the sidebar on every configured start.
   let visible = sidebarVisible;
   let updateSidebar = null;
   const controller = {

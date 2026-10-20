@@ -11,6 +11,11 @@ This file records the notable changes in each dsh-im release. Its format follows
 - 通用设置新增侧边栏入口「自动／始终显示／始终隐藏」模式。默认未配置渠道时显示，保存至少一个渠道后自动隐藏，删除最后一个渠道后恢复；设置保存后即时生效并在 Host 重启后保留。隐藏入口不会停止机器人，仍可从设置或插件详情打开管理面板。
   Added Automatic / Always show / Always hide sidebar entry modes in General settings. Automatic shows the entry before setup, hides it after at least one channel is saved, and restores it after the last channel is removed. Preferences apply immediately and persist across Host restarts. Bots keep running, and Settings and plugin details still open the management panel.
 
+### Fixed / 修复
+
+- 启动时默认隐藏侧边栏入口，收到渠道配置及显示设置后才按需显示，避免已配置用户重启时入口先显示再隐藏造成侧栏闪动。读取失败时保持当前状态，设置与插件详情入口仍可访问。
+  Keep the sidebar entry hidden during startup until channel configuration and visibility preferences arrive, preventing a temporary entry from shifting the sidebar for configured users. Failed reads retain the current state; Settings and plugin details remain accessible.
+
 ## [5.2.0] - 2026-10-20
 
 ### Added / 新增
