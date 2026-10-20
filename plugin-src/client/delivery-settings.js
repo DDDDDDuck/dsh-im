@@ -6,6 +6,7 @@ import { BotSettingsTabs } from './bot-settings-tabs.js';
 import { FeishuGroupSettingsPage } from './channels/feishu/group-settings.js';
 import { FeishuVoiceSettingsPage } from './channels/feishu/voice-settings.js';
 import { FeishuSlashPanelSettingsPage } from './channels/feishu/slash-panel-settings.js';
+import { TelegramGroupTriggersSettings } from './channels/telegram/group-triggers-settings.js';
 import { h, isEnglish, localizeText } from './i18n.js';
 
 export const DELIVERY_RPC_CHANNEL = '/dsh-im-delivery';
@@ -38,8 +39,15 @@ export const FEISHU_BOT_SETTINGS_TABS = Object.freeze([
   Object.freeze({ id: 'voice', label: '语音交互' }),
 ]);
 
+export const TELEGRAM_BOT_SETTINGS_TABS = Object.freeze([
+  ...BOT_SETTINGS_TABS,
+  Object.freeze({ id: 'groups', label: '机器人群聊行为' }),
+]);
+
 export function botSettingsTabsForChannel(channel) {
-  return channel === 'feishu' ? FEISHU_BOT_SETTINGS_TABS : BOT_SETTINGS_TABS;
+  if (channel === 'feishu') return FEISHU_BOT_SETTINGS_TABS;
+  if (channel === 'telegram') return TELEGRAM_BOT_SETTINGS_TABS;
+  return BOT_SETTINGS_TABS;
 }
 
 const CHANNEL_DEFINITIONS = Object.freeze({
@@ -789,6 +797,12 @@ export function DeliveryTargetSettingsPage({
         rpcCall: accessRpcCall,
         onSaved: setAccessPolicy,
       })
+    : activeTab.id === 'groups' && channel === 'telegram'
+      ? h(TelegramGroupTriggersSettings, {
+          key: `${channel}:${account.botId}:groups`,
+          account,
+          rpcCall: accessRpcCall,
+        })
     : activeTab.id === 'group' && channel === 'feishu'
       ? h(FeishuGroupSettingsPage, {
           account,
