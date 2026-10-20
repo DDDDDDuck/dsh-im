@@ -11,7 +11,7 @@ import { createSidebarSettingsRpcHandler } from '../plugin-src/host/sidebar-sett
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 const result = (mode, visible) => ({ ok: true, value: { mode, visible } });
 
-test('sidebar settings load, save all modes, retain edits on failure, and retry load', async (t) => {
+test('sidebar settings save on selection and roll back failed changes with a retry', async (t) => {
   let fail = true;
   const calls = [];
   let renderer;
@@ -27,19 +27,50 @@ test('sidebar settings load, save all modes, retain edits on failure, and retry 
   await act(async () => renderer.root.findAllByType('button').find((button) => button.props.type === 'button').props.onClick());
   const select = () => renderer.root.findByType('select');
   assert.equal(select().props.value, 'auto');
+  assert.equal(renderer.root.findAllByType('form').length, 0);
+  assert.equal(renderer.root.findAllByType('button').length, 0);
   assert.deepEqual(select().findAllByType('option').map((option) => option.props.value), ['auto', 'show', 'hide']);
   for (const mode of ['show', 'hide', 'auto']) {
     await act(async () => select().props.onChange({ target: { value: mode } }));
-    await act(async () => renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }));
     assert.deepEqual(calls.at(-1), ['settings.sidebar-entry.set', { mode }]);
     assert.equal(renderer.root.findByProps({ role: 'status' }).children.join(''), '已保存');
   }
   fail = true;
   await act(async () => select().props.onChange({ target: { value: 'hide' } }));
-  await act(async () => renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }));
-  assert.equal(select().props.value, 'hide');
+  assert.equal(select().props.value, 'auto', 'a failed change must not appear saved');
   assert.equal(select().props.disabled, false);
   assert.equal(renderer.root.findByProps({ role: 'alert' }).children.join(''), '无法保存');
+  fail = false;
+  await act(async () => renderer.root.findByType('button').props.onClick());
+  assert.deepEqual(calls.at(-1), ['settings.sidebar-entry.set', { mode: 'hide' }]);
+  assert.equal(select().props.value, 'hide', 'retry saves the failed selection, not the rolled-back value');
+  assert.equal(renderer.root.findAllByType('button').length, 0);
+});
+
+test('saving a selection disables changes and prevents concurrent requests', async (t) => {
+  const pending = Promise.withResolvers();
+  const calls = [];
+  let renderer;
+  const rpcCall = (endpoint, payload) => {
+    if (endpoint.endsWith('.get')) return Promise.resolve(result('auto', true));
+    calls.push(payload.mode);
+    return pending.promise;
+  };
+  await act(async () => { renderer = create(React.createElement(SidebarSettings, { rpcCall })); });
+  t.after(() => act(() => renderer.unmount()));
+  const select = () => renderer.root.findByType('select');
+  const change = select().props.onChange;
+  await act(async () => {
+    void change({ target: { value: 'show' } });
+    void change({ target: { value: 'hide' } });
+  });
+  assert.deepEqual(calls, ['show']);
+  assert.equal(select().props.disabled, true);
+  assert.equal(select().props.value, 'show');
+  assert.equal(renderer.root.findByProps({ role: 'status' }).children.join(''), '保存中…');
+  await act(async () => { pending.resolve(result('show', true)); });
+  assert.equal(select().props.disabled, false);
+  assert.equal(select().props.value, 'show');
 });
 
 test('failed configuration reads still allow forced modes and retain retry after a failed save', async (t) => {
@@ -56,17 +87,13 @@ test('failed configuration reads still allow forced modes and retain retry after
     t.after(() => act(() => renderer.unmount()));
     await act(async () => { await pending; });
     const select = () => renderer.root.findByType('select');
-    const submit = () => renderer.root.findAllByType('button').find((button) => button.props.type === 'submit');
-    const save = () => renderer.root.findByType('form').props.onSubmit({ preventDefault() {} });
     assert.equal(renderer.root.findAllByProps({ role: 'alert' }).length, 1);
     assert.equal(select().props.disabled, false);
-    assert.equal(submit().props.disabled, false);
-    await act(async () => { await save(); });
+    await act(async () => select().props.onChange({ target: { value: 'auto' } }));
     assert.equal(renderer.root.findAllByProps({ role: 'alert' }).length, 1, 'auto cannot bypass the broken config');
     assert.equal(renderer.root.findAllByType('button').some((button) => button.props.type === 'button'), true,
       'retry remains available after a failed recovery save');
     await act(async () => select().props.onChange({ target: { value: mode } }));
-    await act(async () => { await save(); });
     assert.equal(renderer.root.findAllByProps({ role: 'alert' }).length, 0);
     assert.equal(renderer.root.findByProps({ role: 'status' }).children.join(''), '已保存');
     assert.deepEqual((await handler('settings.sidebar-entry.get', {})).value, { mode, visible: mode === 'show' });
