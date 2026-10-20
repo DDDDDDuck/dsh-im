@@ -4,13 +4,10 @@ const CSS = String.raw`
 .dim-sidebarIcon { display: block; flex: none; }
 .dim-pluginOpen { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 7px 14px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; }
 .dim-pluginOpen:hover { background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
-.dim-pluginOpen:focus-visible, .dim-pluginBack:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #3370ff); outline-offset: 3px; }
+.dim-pluginOpen:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #3370ff); outline-offset: 3px; }
 .dim-pluginPage { height: 100%; min-height: 0; overflow: auto; box-sizing: border-box; padding: 24px clamp(16px, 4vw, 48px) 32px; color: var(--dsw-alias-label-primary, #1f2329); }
 .dim-pluginPageContent { max-width: 1080px; margin: 0 auto; }
-.dim-pluginBack { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; margin: 0 0 24px; padding: 6px 8px; border: 0; border-radius: 8px; color: var(--dsw-alias-label-secondary, #646a73); background: transparent; font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; }
-.dim-pluginBack:hover { color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
-.dim-pluginBack > span { font-size: 22px; line-height: 20px; }
-@media (pointer: coarse) { .dim-pluginOpen, .dim-pluginBack { min-height: 44px; } }
+@media (pointer: coarse) { .dim-pluginOpen { min-height: 44px; } }
 .dim-connectionDiagnostic { min-width: 0; width: 100%; color: var(--dsw-alias-label-secondary, #646a73); overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
 .dim-connectionDiagnostic[data-warning="true"] { color: var(--dsw-alias-state-warn-primary, #d97706); }
 .dim-connectionDiagnostic p { margin: 4px 0; }
