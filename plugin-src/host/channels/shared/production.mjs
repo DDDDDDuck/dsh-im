@@ -135,6 +135,11 @@ export async function createTokenProductionController(ctx, config, internals, de
   const coreController = new ResolvedController({
     credentials: ctx.credentials,
     configStore: observedConfigStore,
+    // Channel settings scoped per chat need the archived group list (titles and
+    // real chat IDs) to offer something better than a blank form.
+    ...(definitions.controllerGroupHistory ? {
+      groupHistory: internals.groupHistory ?? getGroupHistoryStore(ctx, config),
+    } : {}),
     logger,
     ...(internals.inspectToken ? { inspectToken: internals.inspectToken } : {}),
     // Optional per-channel hook: a channel whose own settings also express an
