@@ -3,6 +3,7 @@ import * as React from 'react';
 import { AccessPolicySettingsPage } from './access-policy-settings.js';
 import { BotGeneralSettingsPage } from './bot-general-settings.js';
 import { BotSettingsTabs } from './bot-settings-tabs.js';
+import { DsBotSettingsPage } from './ds-bot-settings.js';
 import { FeishuGroupSettingsPage } from './channels/feishu/group-settings.js';
 import { FeishuVoiceSettingsPage } from './channels/feishu/voice-settings.js';
 import { FeishuSlashPanelSettingsPage } from './channels/feishu/slash-panel-settings.js';
@@ -29,6 +30,7 @@ export const DELIVERY_ENDPOINTS = Object.freeze({
 export const BOT_SETTINGS_TABS = Object.freeze([
   Object.freeze({ id: 'general', label: '通用' }),
   Object.freeze({ id: 'delivery', label: '投递设置' }),
+  Object.freeze({ id: 'ds-bot', label: '绑定bot' }),
   Object.freeze({ id: 'access', label: '访问设置' }),
 ]);
 
@@ -790,6 +792,10 @@ export function DeliveryTargetSettingsPage({
   },
   activeTab.id === 'general'
     ? h(BotGeneralSettingsPage, { key: `${channel}:${account.botId}`, channel, account, rpcCall: accessRpcCall })
+    : activeTab.id === 'ds-bot'
+    ? h(DsBotSettingsPage, {
+        key: account.botId, botId: account.botId, rpcCall: invoke,
+      })
     : activeTab.id === 'access'
     ? h(AccessPolicySettingsPage, {
         channel,

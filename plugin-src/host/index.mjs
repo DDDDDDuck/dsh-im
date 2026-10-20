@@ -19,6 +19,7 @@ import { installHostLanguageRpc } from './host-language-rpc.mjs';
 import { installDeliveryRpc } from './delivery-rpc.mjs';
 import { installDeliveryHttp } from './delivery-http.mjs';
 import { createDeliveryService } from './delivery-service.mjs';
+import { createDsBotClient } from './ds-bot-client.mjs';
 import { installInboundTtlRpc } from './inbound-ttl-rpc.mjs';
 import { installSidebarSettingsRpc } from './sidebar-settings.mjs';
 import { installInjectedContext } from './injected-context.mjs';
@@ -91,7 +92,10 @@ export function createImHostPlugin(internals = {}) {
         .map(([channel]) => channel)
         .filter((channel) => channel !== 'office'
           && config[channel]?.harnessBaseUrl !== undefined);
-      const deliveryService = makeDeliveryService({ unavailableSessionSyncChannels });
+      const deliveryService = makeDeliveryService({
+        unavailableSessionSyncChannels: unavailableSessionSyncChannels.map((channel) => channel === 'wecomApp' ? 'wecom-app' : channel),
+        dsBot: createDsBotClient(ctx),
+      });
       if (typeof ctx?.provide === 'function') {
         ctx.provide('dshIm', Object.freeze({
           contractVersion: 1,

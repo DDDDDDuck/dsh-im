@@ -6,6 +6,29 @@ import * as React from 'react';
 export const IM_LOCALE_NAMESPACE = 'dsh-im';
 
 const EN = Object.freeze({
+  "私聊对象": "Private chat",
+  "选择私聊对象": "Select a private chat",
+  "仅支持已经建立会话的私聊，请先与机器人私聊后刷新。": "Only established private chats are supported. Message the bot privately, then refresh.",
+  "选择 DS Bot 和私聊对象，直接使用 Bot 的会话。": "Choose a DS Bot and a private chat to use the Bot’s session.",
+  "还没有可绑定的私聊。先给这个机器人发一条私聊消息，再点击刷新。": "No private chats yet. Send this bot a private message, then refresh.",
+
+  "绑定bot": "Bind bot",
+  "正在检测 DS Bot…": "Checking DS Bot…",
+  "选择 DS Bot": "Select DS Bot",
+  "解除绑定": "Unbind",
+  "已绑定": "Bound",
+  "未安装 DS Bot，请先在 DSH 插件管理中安装 ds-bot，然后刷新。": "DS Bot is not installed. Install ds-bot in DSH plugin management, then refresh.",
+  "DS Bot 尚未启用，请在 DSH 插件管理中启用后刷新。": "DS Bot is disabled. Enable it in DSH plugin management, then refresh.",
+  "暂时无法读取 DS Bot，请检查插件是否正常运行后重试。": "Unable to read DS Bot. Check that the plugin is running, then retry.",
+  "DS Bot 当前由其他 Host 管理，请在运行它的 Host 中绑定。": "DS Bot is managed by another Host. Bind it on that Host.",
+  "绑定bot仅支持当前 Host 的会话，请先检查机器人的 Harness 连接设置。": "Bot binding requires the current Host. Check the bot’s Harness connection settings.",
+  "所选 DS Bot 已不存在，请刷新后重新选择。": "The selected DS Bot no longer exists. Refresh and select another.",
+  "绑定设置保存失败，请刷新后重试。": "Could not save the binding. Refresh and retry.",
+  "绑定已保存。": "Binding saved.",
+  "已解除绑定，聊天记录保留。": "Binding removed. Chat history is preserved.",
+  "还没有 DS Bot，请先在 DS Bot 中创建机器人后刷新。": "No bots yet. Create a bot in DS Bot, then refresh.",
+  "DS Bot 暂不可用": "DS Bot unavailable",
+
   ...weixinDiagnostics,
   ...diagnostics,
   ...imageInput,
