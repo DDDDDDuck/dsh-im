@@ -23,6 +23,7 @@ const PUBLIC_ERRORS = new Set([
   'ds-bot-not-found',
   'ds-bot-bound',
   'ds-bot-private-required',
+  'ds-bot-binding-conflict',
   'bad-request',
   'unknown-bot',
   'unknown-target',

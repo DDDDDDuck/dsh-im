@@ -24,6 +24,7 @@ const DELIVERY_ERROR_CODES = new Set([
   'ds-bot-not-found',
   'ds-bot-bound',
   'ds-bot-private-required',
+  'ds-bot-binding-conflict',
   'bad-request',
   'account-unverified',
   'account-changed',

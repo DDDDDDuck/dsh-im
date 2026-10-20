@@ -46,9 +46,60 @@ test('binding page works without any delivery RPC and renders avatars in the pic
   const row = renderer.root.findByType('li');
   assert.equal(row.findByType(DsBotAvatar).props.bot.name, 'stepBot');
   assert.match(text(row), /stepBot.*已绑定.*private-one/);
+  assert.equal(renderer.root.findByType(DsBotPicker).props.value, '');
+  assert.deepEqual(renderer.root.findByType(DsBotPicker).props.bots.map((bot) => bot.id), ['ds-two']);
+  assert.equal(renderer.root.findByType('select').props.value, '');
+  assert.equal(renderer.root.findByType('select').props.disabled, true);
+  assert.deepEqual(renderer.root.findByType('select').findAllByType('option').map((option) => option.props.value), ['']);
+  assert.equal(renderer.root.findByProps({ type: 'submit' }).props.disabled, true);
   await act(async () => row.findByType('button').props.onClick());
   assert.equal(renderer.root.findAllByType('li').length, 0);
+  assert.equal(renderer.root.findByType('select').props.disabled, false);
+  assert.equal(renderer.root.findByType(DsBotPicker).props.bots.length, 2);
+  assert.equal(renderer.root.findByType('select').findAllByType('option')[1].props.value, key);
   assert.equal(calls.every((call) => call.endpoint.startsWith('ds-bot.')), true);
+});
+
+test('refresh excludes bindings made elsewhere and clears stale selections', async (t) => {
+  const otherKey = 'c2c:private-two';
+  let bound = false;
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(DsBotSettingsPage, {
+      botId: 'im-one', rpcCall: async () => ({
+        state: 'ready', bots,
+        conversations: [
+          { conversationKey: key, address: 'private-one', ...(bound ? { dsBotId: 'ds-one' } : {}) },
+          { conversationKey: otherKey, address: 'private-two' },
+        ],
+      }),
+    }));
+  });
+  t.after(async () => act(async () => renderer.unmount()));
+  await act(async () => renderer.root.findByType(DsBotPicker).props.onChange('ds-one'));
+  await act(async () => renderer.root.findByType('select').props.onChange({ target: { value: key } }));
+  assert.equal(renderer.root.findByProps({ type: 'submit' }).props.disabled, false);
+  bound = true;
+  await act(async () => renderer.root.findAllByType('button').find((button) => text(button) === '刷新').props.onClick());
+  assert.equal(renderer.root.findByType(DsBotPicker).props.value, '');
+  assert.equal(renderer.root.findByType('select').props.value, '');
+  assert.equal(renderer.root.findByProps({ type: 'submit' }).props.disabled, true);
+  assert.deepEqual(renderer.root.findByType('select').findAllByType('option').map((option) => option.props.value), ['', otherKey]);
+  await act(async () => renderer.root.findByType(DsBotPicker).props.onChange('ds-two'));
+  await act(async () => renderer.root.findByType('select').props.onChange({ target: { value: otherKey } }));
+  assert.equal(renderer.root.findByProps({ type: 'submit' }).props.disabled, false);
+});
+
+test('no remaining bots disables the picker without creating an empty listbox', async () => {
+  let renderer;
+  await act(async () => { renderer = create(React.createElement(DsBotPicker, {
+    bots: [], value: '', onChange() { assert.fail('No selection should be possible'); },
+  })); });
+  const picker = renderer.root.findByProps({ role: 'combobox' });
+  assert.equal(picker.props.disabled, true);
+  await act(async () => picker.props.onKeyDown({ key: 'ArrowDown', preventDefault() {} }));
+  assert.equal(renderer.root.findAllByProps({ role: 'listbox' }).length, 0);
+  await act(async () => renderer.unmount());
 });
 
 test('empty private chats show one instruction, with no dependency on delivery settings', async () => {

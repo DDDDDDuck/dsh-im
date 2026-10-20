@@ -15,6 +15,7 @@ export function dsBotErrorMessage(error) {
     'ds-bot-unavailable': DS_BOT_MESSAGES.unavailable,
     'ds-bot-not-found': '所选 DS Bot 已不存在，请刷新后重新选择。',
     'ds-bot-private-required': '仅支持已经建立会话的私聊，请先与机器人私聊后刷新。',
+    'ds-bot-binding-conflict': '所选 DS Bot 或私聊对象已绑定，请刷新后重新选择。',
   }[error?.code] ?? '绑定设置保存失败，请刷新后重试。';
 }
 
@@ -25,6 +26,7 @@ export function DsBotPicker({ bots, value, onChange, disabled }) {
   const trigger = React.useRef(null);
   const listId = React.useId();
   const selected = bots.find((bot) => bot.id === value);
+  const isOpen = open && !disabled && bots.length > 0;
   React.useEffect(() => {
     const dismiss = (event) => { if (!root.current?.contains(event.target)) setOpen(false); };
     if (open) globalThis.document?.addEventListener('pointerdown', dismiss);
@@ -35,10 +37,11 @@ export function DsBotPicker({ bots, value, onChange, disabled }) {
   return h('div', { className: 'dim-dsBotPicker', ref: root },
     h('button', {
       type: 'button', role: 'combobox', ref: trigger, className: 'dim-dsBotPickerTrigger',
-      disabled, 'aria-label': 'DS Bot', 'aria-expanded': open, 'aria-controls': listId,
-      'aria-haspopup': 'listbox', 'aria-activedescendant': open ? optionId(active) : undefined,
+      disabled: disabled || !bots.length, 'aria-label': 'DS Bot', 'aria-expanded': isOpen, 'aria-controls': listId,
+      'aria-haspopup': 'listbox', 'aria-activedescendant': isOpen ? optionId(active) : undefined,
       onClick: () => { setActive(Math.max(0, bots.findIndex((bot) => bot.id === value))); setOpen(!open); },
       onKeyDown: (event) => {
+        if (disabled || !bots.length) return;
         if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
           event.preventDefault();
           const index = event.key === 'Home' ? 0 : event.key === 'End' ? bots.length - 1
@@ -52,10 +55,10 @@ export function DsBotPicker({ bots, value, onChange, disabled }) {
     },
     selected ? h(DsBotAvatar, { bot: selected }) : null,
     selected ? React.createElement('span', { className: 'dim-dsBotPickerName' }, selected.name)
-      : h('span', { className: 'dim-dsBotPickerName' }, '选择 DS Bot'),
+      : h('span', { className: 'dim-dsBotPickerName' }, bots.length ? '选择 DS Bot' : '暂无可选 DS Bot'),
     h('svg', { width: 14, height: 14, viewBox: '0 0 16 16', 'aria-hidden': true },
       h('path', { d: 'm4 6 4 4 4-4', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' }))),
-    open ? h('div', { id: listId, role: 'listbox', 'aria-label': 'DS Bot', className: 'dim-dsBotOptions' },
+    isOpen ? h('div', { id: listId, role: 'listbox', 'aria-label': 'DS Bot', className: 'dim-dsBotOptions' },
       bots.map((bot, index) => h('button', {
         key: bot.id, id: optionId(index), type: 'button', role: 'option', tabIndex: -1,
         'aria-selected': value === bot.id, 'data-active': active === index,
@@ -98,14 +101,27 @@ export function DsBotSettingsPage({ botId, rpcCall }) {
   const conversations = status?.conversations ?? [];
   const bots = status?.bots ?? [];
   const bindings = conversations.filter((conversation) => conversation.dsBotId);
+  const usedBotIds = new Set(bindings.map((binding) => binding.dsBotId));
+  const availableBots = bots.filter((bot) => !usedBotIds.has(bot.id));
+  const availableConversations = conversations.filter((conversation) => !conversation.dsBotId);
+  const canSave = !busy && !loading && status?.state === 'ready'
+    && availableBots.some((bot) => bot.id === dsBotId)
+    && availableConversations.some((conversation) => conversation.conversationKey === conversationKey);
+  React.useEffect(() => {
+    setDsBotId((value) => availableBots.some((bot) => bot.id === value) ? value : '');
+    setConversationKey((value) => availableConversations.some((conversation) => conversation.conversationKey === value) ? value : '');
+  }, [status]);
   const save = async (event) => {
     event.preventDefault();
+    if (!canSave) return;
     setBusy(true); setFeedback(null);
     try {
       await rpcCall('ds-bot.bind', { botId, conversationKey, dsBotId });
+      setDsBotId(''); setConversationKey('');
       await refresh();
       setFeedbackTone('success'); setFeedback('绑定已保存。');
     } catch (error) {
+      if (error?.code === 'ds-bot-binding-conflict') await refresh();
       setFeedbackTone('error'); setFeedback(dsBotErrorMessage(error));
     } finally { setBusy(false); }
   };
@@ -130,23 +146,21 @@ export function DsBotSettingsPage({ botId, rpcCall }) {
       : h('form', { className: 'dim-dsBotForm', onSubmit: save },
         h('div', { className: 'dim-targetFormGrid' },
           h('div', { className: 'dim-targetField' }, h('span', null, 'DS Bot'),
-            h(DsBotPicker, { bots, value: dsBotId, onChange: setDsBotId, disabled: busy || loading })),
+            h(DsBotPicker, { bots: availableBots, value: dsBotId, onChange: setDsBotId, disabled: busy || loading })),
           h('label', { className: 'dim-targetField' }, h('span', null, '私聊对象'),
             h('select', {
-              value: conversationKey, required: true, disabled: busy || loading,
-              onChange: (event) => {
-                setConversationKey(event.target.value);
-                const bound = conversations.find((conversation) => conversation.conversationKey === event.target.value)?.dsBotId;
-                if (bound) setDsBotId(bound);
-              },
-            }, h('option', { value: '' }, '选择私聊对象'),
-            conversations.map((conversation) => React.createElement('option', {
+              value: conversationKey, required: true, disabled: busy || loading || !availableConversations.length,
+              onChange: (event) => setConversationKey(event.target.value),
+            }, h('option', { value: '' }, availableConversations.length ? '选择私聊对象' : '暂无可选私聊对象'),
+            availableConversations.map((conversation) => React.createElement('option', {
               key: conversation.conversationKey, value: conversation.conversationKey,
             }, conversationLabel(conversation)))))),
+        !availableBots.length || !availableConversations.length
+          ? h('p', { className: 'dim-dsBotNotice' }, '已绑定的 DS Bot 和私聊对象不可重复选择，解除绑定后可重新选择。')
+          : null,
         h('div', { className: 'dim-targetFormActions' },
           h('button', { type: 'submit', className: 'dim-deliveryButton', 'data-kind': 'primary',
-            disabled: busy || loading || !bots.some((bot) => bot.id === dsBotId)
-              || !conversations.some((conversation) => conversation.conversationKey === conversationKey),
+            disabled: !canSave,
           }, busy ? '正在保存…' : '保存绑定'))),
     bindings.length ? h('ul', { className: 'dim-targetList' }, bindings.map((conversation) => {
       const bot = bots.find((entry) => entry.id === conversation.dsBotId);
