@@ -239,12 +239,14 @@ test('client startup waits for configuration before showing the sidebar', async 
     const root = new Context();
     const slots = slotLedger(true);
     let finishInitial;
+    const calls = [];
     root.provide('slots', slots);
     root.provide('locale', { register: () => () => {}, bind: () => (key) => key });
     root.provide('workspaces', {});
     root.provide('layout', { selectPanel() {} });
     root.provide('pluginNavigation', { openBundle() {} });
     root.provide('connection', { rpc: { call: async (_path, _channel, { method, payload }) => {
+      calls.push({ channel: _channel, method });
       if (method === 'settings.sidebar-entry.get') return new Promise((resolve) => { finishInitial = resolve; });
       if (method === 'settings.sidebar-entry.set') return { ok: true, value: { mode: payload.mode, visible: payload.mode === 'show' } };
       return { ok: true, value: {} };
@@ -266,6 +268,10 @@ test('client startup waits for configuration before showing the sidebar', async 
     assert.equal(slots.entries.size, 4);
     await globalSettingsRpcCall('settings.sidebar-entry.set', { mode: 'hide' });
     assert.equal(slots.entries.size, 3);
+    assert.ok(calls.filter(({ method }) => method.startsWith('settings.sidebar-entry.'))
+      .every(({ channel }) => channel === 'dsh-im/dsh-im-sidebar'));
+    await globalSettingsRpcCall('settings.group-history.get', {});
+    assert.deepEqual(calls.at(-1), { channel: 'dsh-im/dsh-im-settings', method: 'settings.group-history.get' });
     await plugin.dispose();
     assert.equal(slots.entries.size, 0);
     assert.equal(slots.waiting.size, 0);
