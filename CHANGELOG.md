@@ -15,6 +15,8 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 - 启动时默认隐藏侧边栏入口，收到渠道配置及显示设置后才按需显示，避免已配置用户重启时入口先显示再隐藏造成侧栏闪动。读取失败时保持当前状态，设置与插件详情入口仍可访问。
   Keep the sidebar entry hidden during startup until channel configuration and visibility preferences arrive, preventing a temporary entry from shifting the sidebar for configured users. Failed reads retain the current state; Settings and plugin details remain accessible.
+- iMessage 渠道在 macOS 26（Tahoe）上会静默跳过收到的消息：系统不再写入 `message.text`，正文只存在于 `message.attributedBody`。消息查询改为同时接受两列，并在 `text` 为空时解码 typedstream 正文；纯附件占位（U+FFFC）仍视为无文本。
+  iMessage messages were silently skipped on macOS 26 (Tahoe), where Messages no longer writes `message.text` and stores the body only in `message.attributedBody`. The query now accepts either column and decodes the typedstream body when `text` is empty; attachment-only runs (U+FFFC) still count as no text.
 
 ## [5.2.0] - 2026-10-20
 
