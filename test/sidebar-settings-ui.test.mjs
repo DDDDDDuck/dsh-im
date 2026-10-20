@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 import { SidebarSettings, installSidebarVisibilitySync } from '../plugin-src/client/sidebar-settings.js';
+import { createSidebarSettingsRpcHandler } from '../plugin-src/host/sidebar-settings.mjs';
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 const result = (mode, visible) => ({ ok: true, value: { mode, visible } });
@@ -18,7 +22,7 @@ test('sidebar settings load, save all modes, retain edits on failure, and retry 
   };
   t.after(() => act(() => renderer.unmount()));
   await act(async () => { renderer = create(React.createElement(SidebarSettings, { rpcCall })); });
-  assert.equal(renderer.root.findByType('select').props.disabled, true);
+  assert.equal(renderer.root.findByType('select').props.disabled, false);
   fail = false;
   await act(async () => renderer.root.findAllByType('button').find((button) => button.props.type === 'button').props.onClick());
   const select = () => renderer.root.findByType('select');
@@ -36,6 +40,37 @@ test('sidebar settings load, save all modes, retain edits on failure, and retry 
   assert.equal(select().props.value, 'hide');
   assert.equal(select().props.disabled, false);
   assert.equal(renderer.root.findByProps({ role: 'alert' }).children.join(''), '无法保存');
+});
+
+test('failed configuration reads still allow forced modes and retain retry after a failed save', async (t) => {
+  for (const mode of ['show', 'hide']) await t.test(mode, async (t) => {
+    const dshHome = await mkdtemp(join(tmpdir(), 'dsh-sidebar-ui-'));
+    t.after(() => rm(dshHome, { recursive: true, force: true }));
+    await mkdir(join(dshHome, 'integrations/dsh-qq'), { recursive: true });
+    await writeFile(join(dshHome, 'integrations/dsh-qq/config.json'), '{broken');
+    const handler = createSidebarSettingsRpcHandler({ config: { dshHome } });
+    let pending;
+    const rpcCall = (...args) => (pending = handler(...args));
+    let renderer;
+    await act(async () => { renderer = create(React.createElement(SidebarSettings, { rpcCall })); });
+    t.after(() => act(() => renderer.unmount()));
+    await act(async () => { await pending; });
+    const select = () => renderer.root.findByType('select');
+    const submit = () => renderer.root.findAllByType('button').find((button) => button.props.type === 'submit');
+    const save = () => renderer.root.findByType('form').props.onSubmit({ preventDefault() {} });
+    assert.equal(renderer.root.findAllByProps({ role: 'alert' }).length, 1);
+    assert.equal(select().props.disabled, false);
+    assert.equal(submit().props.disabled, false);
+    await act(async () => { await save(); });
+    assert.equal(renderer.root.findAllByProps({ role: 'alert' }).length, 1, 'auto cannot bypass the broken config');
+    assert.equal(renderer.root.findAllByType('button').some((button) => button.props.type === 'button'), true,
+      'retry remains available after a failed recovery save');
+    await act(async () => select().props.onChange({ target: { value: mode } }));
+    await act(async () => { await save(); });
+    assert.equal(renderer.root.findAllByProps({ role: 'alert' }).length, 0);
+    assert.equal(renderer.root.findByProps({ role: 'status' }).children.join(''), '已保存');
+    assert.deepEqual((await handler('settings.sidebar-entry.get', {})).value, { mode, visible: mode === 'show' });
+  });
 });
 
 function syncHarness(t) {
