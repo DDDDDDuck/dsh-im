@@ -6,6 +6,21 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+### Added / 新增
+
+- 通用设置新增侧边栏入口「自动／始终显示／始终隐藏」模式。默认未配置渠道时显示，保存至少一个渠道后自动隐藏，删除最后一个渠道后恢复；设置保存后即时生效并在 Host 重启后保留。隐藏入口不会停止机器人，仍可从设置或插件详情打开管理面板。
+  Added Automatic / Always show / Always hide sidebar entry modes in General settings. Automatic shows the entry before setup, hides it after at least one channel is saved, and restores it after the last channel is removed. Preferences apply immediately and persist across Host restarts. Bots keep running, and Settings and plugin details still open the management panel.
+
+### Fixed / 修复
+
+- 侧边栏入口设置使用独立管理接口并遵循 `rpcAuthority`，修复通过已认证的局域网或域名访问时入口一直隐藏、无法强制显示的问题；TTL 等通用设置接口继续仅限本机。读取设置或渠道配置失败时，仍可选择并保存「始终显示／始终隐藏」，保存失败后保留重试入口。
+  Sidebar visibility uses a dedicated management route that follows `rpcAuthority`, restoring the entry and forced visibility settings for authenticated LAN and domain access. General settings such as TTL remain loopback-only. Failed settings or channel configuration reads still allow saving Always show / Always hide, and failed recovery saves retain Retry.
+
+- 启动时默认隐藏侧边栏入口，收到渠道配置及显示设置后才按需显示，避免已配置用户重启时入口先显示再隐藏造成侧栏闪动。读取失败时保持当前状态，设置与插件详情入口仍可访问。
+  Keep the sidebar entry hidden during startup until channel configuration and visibility preferences arrive, preventing a temporary entry from shifting the sidebar for configured users. Failed reads retain the current state; Settings and plugin details remain accessible.
+- iMessage 渠道在 macOS 26（Tahoe）上会静默跳过收到的消息：系统不再写入 `message.text`，正文只存在于 `message.attributedBody`。消息查询改为同时接受两列，并在 `text` 为空时解码 typedstream 正文；纯附件占位（U+FFFC）仍视为无文本。
+  iMessage messages were silently skipped on macOS 26 (Tahoe), where Messages no longer writes `message.text` and stores the body only in `message.attributedBody`. The query now accepts either column and decodes the typedstream body when `text` is empty; attachment-only runs (U+FFFC) still count as no text.
+
 ## [5.2.0] - 2026-10-20
 
 ### Added / 新增
