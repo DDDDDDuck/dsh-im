@@ -4,6 +4,9 @@ import { resolveRpcAuthority } from './rpc-authority.mjs';
 export const DELIVERY_RPC_CHANNEL = '/dsh-im-delivery';
 export const DELIVERY_TEST_MESSAGE = 'DSH-IM 主动投递测试成功。';
 export const DELIVERY_ENDPOINTS = Object.freeze({
+  dsBotStatus: 'ds-bot.status',
+  bindDsBot: 'ds-bot.bind',
+  unbindDsBot: 'ds-bot.unbind',
   send: 'message.send',
   listTargets: 'target.list',
   listSuggestions: 'target.suggestion.list',
@@ -16,6 +19,10 @@ export const DELIVERY_ENDPOINTS = Object.freeze({
 
 const ENDPOINTS = new Set(Object.values(DELIVERY_ENDPOINTS));
 const PUBLIC_ERRORS = new Set([
+  'ds-bot-unavailable',
+  'ds-bot-not-found',
+  'ds-bot-bound',
+  'ds-bot-private-required',
   'bad-request',
   'unknown-bot',
   'unknown-target',
@@ -46,6 +53,11 @@ function validTargetId(value) {
   return typeof value === 'string' && /^[A-Za-z0-9._:@-]{1,128}$/.test(value);
 }
 
+function validConversationKey(value) {
+  return typeof value === 'string' && Boolean(value) && value.length <= 1_024
+    && value.trim() === value && !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
 function validTarget(value, { targetId }) {
   const keys = targetId ? ['targetId', 'name', 'kind', 'route'] : ['name', 'kind', 'route'];
   if (!isRecord(value) || Object.keys(value).some((key) => !keys.includes(key))) return false;
@@ -72,8 +84,17 @@ function validPayload(endpoint, payload) {
       && typeof payload.text === 'string' && Boolean(payload.text.trim());
   }
   if (endpoint === DELIVERY_ENDPOINTS.listTargets
+    || endpoint === DELIVERY_ENDPOINTS.dsBotStatus
     || endpoint === DELIVERY_ENDPOINTS.listSuggestions) {
     return exactKeys(payload, ['botId']) && validBotId(payload.botId);
+  }
+  if (endpoint === DELIVERY_ENDPOINTS.bindDsBot) {
+    return exactKeys(payload, ['botId', 'conversationKey', 'dsBotId'])
+      && validBotId(payload.botId) && validConversationKey(payload.conversationKey) && validBotId(payload.dsBotId);
+  }
+  if (endpoint === DELIVERY_ENDPOINTS.unbindDsBot) {
+    return exactKeys(payload, ['botId', 'conversationKey'])
+      && validBotId(payload.botId) && validConversationKey(payload.conversationKey);
   }
   if (endpoint === DELIVERY_ENDPOINTS.createTarget) {
     return exactKeys(payload, ['botId', 'target'])
@@ -129,7 +150,13 @@ export function createDeliveryRpcHandler(service) {
     }
     try {
       let value;
-      if (endpoint === DELIVERY_ENDPOINTS.send) {
+      if (endpoint === DELIVERY_ENDPOINTS.dsBotStatus) {
+        value = await service.dsBotStatus(payload.botId);
+      } else if (endpoint === DELIVERY_ENDPOINTS.bindDsBot) {
+        value = await service.bindDsBot(payload.botId, payload.conversationKey, payload.dsBotId);
+      } else if (endpoint === DELIVERY_ENDPOINTS.unbindDsBot) {
+        value = await service.unbindDsBot(payload.botId, payload.conversationKey);
+      } else if (endpoint === DELIVERY_ENDPOINTS.send) {
         value = await service.send(payload.botId, payload.targetId, payload.text, {
           signal,
           ...(payload.format === undefined ? {} : { format: payload.format }),

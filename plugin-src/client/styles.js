@@ -599,6 +599,25 @@ const CSS = String.raw`
 .dim-targetField input[readonly] { color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-module-platform, #f7f8fa); }
 .dim-targetFormError { margin: 10px 0 0; font-size: 12px; line-height: 18px; }
 .dim-targetFormActions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 12px; }
+.dim-dsBotForm { margin-top: 20px; }
+.dim-dsBotForm .dim-targetFormGrid { grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); margin-top: 0; gap: 16px; }
+.dim-dsBotForm .dim-targetFormActions { margin-top: 16px; }
+.dim-targetRow.dim-dsBotBinding { grid-template-columns: minmax(0, 1fr) max-content; align-items: center; }
+.dim-dsBotDestination { margin: 3px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.dim-dsBotNotice { margin: 20px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 20px; }
+.dim-dsBotNotice p { margin: 0 0 10px; }
+.dim-dsBotSettings > .dim-targetFeedback { margin-top: 12px; }
+.dim-dsBotAvatar { display: block; flex: none; object-fit: cover; border-radius: 5px; }
+.dim-dsBotBoundIdentity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.dim-dsBotPicker { position: relative; min-width: 0; }
+.dim-dsBotPickerTrigger { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; padding: 0 9px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 7px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.dim-dsBotPickerName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dim-dsBotPickerTrigger:focus-visible { outline: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary, #3370ff) 28%, transparent); border-color: var(--dsw-alias-state-business-primary, #3370ff); }
+.dim-dsBotPickerTrigger:disabled { opacity: .5; cursor: not-allowed; }
+.dim-dsBotOptions { position: absolute; z-index: 20; inset: calc(100% + 5px) 0 auto; max-height: 240px; overflow-y: auto; padding: 4px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 9px; background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: 0 5px 18px rgb(0 0 0 / 10%); }
+.dim-dsBotOptions > button { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 5px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--dsw-alias-label-primary, #1f2329); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.dim-dsBotOptions > button[data-active="true"] { background: var(--dsw-alias-interactive-bg-hover, #eef0f3); }
+.dim-dsBotOptions > button[aria-selected="true"] { color: var(--dsw-alias-state-business-primary, #3370ff); }
 .dim-accessPage { min-width: 0; display: grid; gap: 14px; }
 .dim-accessScene { position: relative; min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 12px; background: var(--dsw-alias-bg-layer-3, #fff); }
 .dim-accessScene > legend { padding: 0 6px; color: var(--dsw-alias-label-primary, #1f2329); font-size: 15px; line-height: 22px; font-weight: 650; }

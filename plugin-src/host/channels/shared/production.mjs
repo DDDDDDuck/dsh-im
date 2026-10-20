@@ -167,6 +167,7 @@ export async function createTokenProductionController(ctx, config, internals, de
       const state = await stateFor(botId);
       await ensureWorkspace(botId, botConfig);
       const workspaceScope = createBotWorkspaceScope(harness, {
+        dsBot: config.deliveryService?.dsBot,
         botId, workspaces, state, agentPresetCatalog,
       });
       const persistTokens = typeof definitions.persistBotCredential === 'function'
@@ -232,7 +233,7 @@ export async function createTokenProductionController(ctx, config, internals, de
   return {
     controller,
     ...(supportsDeliveryChannel(channel) ? {
-      deliveryAdapter: createDeliveryAdapter({ channel, workspaces, coreController, stateFor }),
+      deliveryAdapter: createDeliveryAdapter({ dsBot: config.deliveryService?.dsBot, channel, workspaces, coreController, stateFor }),
     } : {}),
     ready: supervisor.ready,
     async close() {
