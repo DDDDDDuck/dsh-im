@@ -56,8 +56,16 @@
 >
 > 为避免名称混淆，在插件市场搜索、插件安装框中填写或使用命令安装时，请复制完整包名 **`@xmanrui/dsh-im`**。
 >
-> **DSH Desktop**（内置终端）：`dsh plugin --profile desktop add -w @xmanrui/dsh-im`<br>
-> **DSH Web**（启动当前 Harness 的终端）：`dsh plugin --profile web add -w @xmanrui/dsh-im`<br>
+> 选择对应的一条命令：**Desktop** 在内置终端执行，**Web** 在启动当前 Harness 的终端执行。
+>
+> ```sh
+> dsh plugin --profile desktop add -w @xmanrui/dsh-im
+> ```
+>
+> ```sh
+> dsh plugin --profile web add -w @xmanrui/dsh-im
+> ```
+>
 > 安装后重启 Desktop 或 `dsh web`，Web 刷新浏览器，再打开「设置 → IM机器人」。
 
 ## 简介
