@@ -300,6 +300,9 @@ export function createDeliveryAdapter({ channel, workspaces, coreController, sta
     },
     ownsBot: (botId) => workspaces.has(botId),
     listBots: () => workspaces.listBotIds(),
+    listDsBotBindings: () => workspaces.listDsBotBindings().filter(({ conversationKey }) => (
+      privateDeliverySuggestionFromConversationKey(channel, conversationKey)
+    )),
     async listTargets(botId) {
       const targets = workspaces.listDeliveryTargets(botId);
       const configured = new Map(

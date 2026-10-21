@@ -158,6 +158,23 @@ export class DeliveryService {
     this.dsBot = dsBot;
   }
 
+  async listDsBotSessions() {
+    const ids = new Set();
+    for (const { adapter } of this.#adapters.values()) {
+      if (!this.#supportsSessionSync(adapter)) continue;
+      for (const binding of await adapter.listDsBotBindings?.() ?? []) ids.add(binding.dsBotId);
+    }
+    if (!ids.size) return [];
+    const result = await this.dsBot?.status();
+    if (result?.state !== 'ready') return [];
+    // Only current, bound sessions and public appearance; no private routes,
+    // account configuration, conversation contents, or historical parts.
+    return result.bots.filter((bot) => ids.has(bot.id)).map(({ sessionId, id, name, color, avatar }) => ({
+      sessionId,
+      bot: { id, name, ...(color ? { color } : {}), ...(avatar ? { avatar } : {}) },
+    }));
+  }
+
   async dsBotStatus(botId) {
     const adapter = await this.#adapterFor(botIdOf(botId));
     const result = this.#supportsSessionSync(adapter)
