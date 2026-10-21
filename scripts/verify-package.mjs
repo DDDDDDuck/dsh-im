@@ -262,6 +262,17 @@ if (process.platform !== 'win32' && (executable.mode & 0o111) === 0) {
 if (/private-bot-token|must-be-rolled-back|DEEPSEEK_API_KEY=/.test(client + host)) {
   throw new Error('built artifacts contain a test or environment secret marker');
 }
-await import(pathToFileURL(resolve(root, 'lib/index.js')).href);
+const { createImHostPlugin } = await import(pathToFileURL(resolve(root, 'lib/index.js')).href);
+let deliveryApi;
+await createImHostPlugin().apply({
+  provide(name, service) {
+    if (name === 'dshIm') deliveryApi = service;
+  },
+  // Inspect the published service without starting channels or opening connections.
+  inject() {},
+});
+if (typeof deliveryApi?.createTarget !== 'function') {
+  throw new Error('host bundle must expose dshIm.createTarget; rebuild before publishing');
+}
 
 console.log('Verified dsh-im package artifacts.');
