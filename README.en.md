@@ -51,7 +51,8 @@
 <!-- -->
 
 > [!IMPORTANT]
-> **Install using the full package name:**
+> **Install using the full package name:**<br>
+> **`@xmanrui/dsh-im`**
 >
 > ```text
 > @xmanrui/dsh-im

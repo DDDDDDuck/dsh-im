@@ -52,7 +52,8 @@
 <!-- -->
 
 > [!IMPORTANT]
-> **安装请认准完整包名：**
+> **安装请认准完整包名：**<br>
+> **`@xmanrui/dsh-im`**
 >
 > ```text
 > @xmanrui/dsh-im
