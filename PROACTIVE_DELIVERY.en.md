@@ -201,6 +201,19 @@ const targets = await ctx.dshIm.listTargets(botId);
 // [{ targetId, name?, kind, route }, ...]
 ```
 
+A same-Host plugin may also register a known conversation route as a delivery target. Once registered, that `targetId` can be used with `send` and appears in the settings target list:
+
+```js
+await ctx.dshIm.createTarget(botId, {
+  targetId: 'release-alerts',
+  kind: 'user',                 // 'user' or 'group'
+  route: { chatId: '...' },
+  name: 'Release alerts',       // optional
+});
+```
+
+An existing `targetId` is rejected with `target-conflict`; updating or deleting a saved target still goes through the management RPC's `target.update` / `target.delete`.
+
 Companion plugins can discover configured bots through the same Host service:
 
 ```js

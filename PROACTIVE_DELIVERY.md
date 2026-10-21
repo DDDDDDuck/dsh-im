@@ -201,6 +201,19 @@ const targets = await ctx.dshIm.listTargets(botId);
 // [{ targetId, name?, kind, route }, ...]
 ```
 
+同 Host 插件也可以把已知的会话路由注册成投递目标。注册后该 `targetId` 可直接用于 `send`，并出现在设置页的目标列表里：
+
+```js
+await ctx.dshIm.createTarget(botId, {
+  targetId: 'release-alerts',
+  kind: 'user',                 // 'user' 或 'group'
+  route: { chatId: '...' },
+  name: '发布提醒',              // 可选
+});
+```
+
+`targetId` 已存在时以 `target-conflict` 拒绝；修改或删除已有目标仍走管理 RPC 的 `target.update` / `target.delete`。
+
 同 Host 插件可以通过同一个服务发现已配置机器人：
 
 ```js
