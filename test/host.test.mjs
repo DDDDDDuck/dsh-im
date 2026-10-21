@@ -159,10 +159,10 @@ test('Host provides #65 and installs #84 with the same delivery service', async 
   assert.ok(channelServices.every((service) => service === deliveryService));
   assert.deepEqual(await provided[0][1].listTargets('bot_one'), [{ targetId: 'target' }]);
   assert.deepEqual(
-    await provided[0][1].createTarget('bot_one', { targetId: 'new-target', kind: 'user', route: { chatId: 'chat-one' } }),
+    await provided[0][1].createTarget('bot_one', { targetId: 'new-target', kind: 'chat', route: { chatId: '123456789' } }),
     { targetId: 'new-target' },
   );
-  assert.deepEqual(created, [['bot_one', { targetId: 'new-target', kind: 'user', route: { chatId: 'chat-one' } }]]);
+  assert.deepEqual(created, [['bot_one', { targetId: 'new-target', kind: 'chat', route: { chatId: '123456789' } }]]);
   assert.deepEqual(await provided[0][1].listBots(), [{ botId: 'bot_one', channel: 'telegram' }]);
   assert.deepEqual(await provided[0][1].send('bot_one', 'target', 'hello'), { sent: true });
   assert.deepEqual(sent, [['bot_one', 'target', 'hello', undefined]]);
