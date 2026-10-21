@@ -90,6 +90,96 @@ test('refresh excludes bindings made elsewhere and clears stale selections', asy
   assert.equal(renderer.root.findByProps({ type: 'submit' }).props.disabled, false);
 });
 
+test('binding page silently refreshes names and logos without clearing selections or closing the picker', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  globalThis.window = new EventTarget();
+  globalThis.document = Object.assign(new EventTarget(), { hidden: false });
+  t.after(() => { globalThis.window = previousWindow; globalThis.document = previousDocument; });
+  const otherKey = 'c2c:private-two';
+  let pending;
+  let calls = 0;
+  let currentBots = bots;
+  const value = () => ({ state: 'ready', bots: currentBots, conversations: [
+    { conversationKey: key, address: 'private-one', dsBotId: 'ds-one' },
+    { conversationKey: otherKey, address: 'private-two' },
+  ] });
+  const rpcCall = async (endpoint) => {
+    assert.equal(endpoint, 'ds-bot.status');
+    calls++;
+    return pending ? pending.promise : value();
+  };
+  let renderer;
+  await act(async () => { renderer = create(React.createElement(DsBotSettingsPage, { botId: 'im-one', rpcCall })); });
+  t.after(() => act(() => renderer.unmount()));
+  await act(async () => renderer.root.findByType(DsBotPicker).props.onChange('ds-two'));
+  await act(async () => renderer.root.findByType('select').props.onChange({ target: { value: otherKey } }));
+  await act(async () => renderer.root.findByProps({ role: 'combobox' }).props.onClick());
+  pending = Promise.withResolvers();
+  await act(async () => t.mock.timers.tick(3_000));
+  assert.equal(calls, 2);
+  assert.equal(renderer.root.findByProps({ role: 'combobox' }).props.disabled, false);
+  assert.equal(renderer.root.findByProps({ role: 'combobox' }).props['aria-expanded'], true);
+  assert.equal(renderer.root.findByProps({ type: 'submit' }).props.disabled, false);
+  currentBots = bots.map((bot) => ({ ...bot, name: `${bot.name} renamed`, color: 'green', avatar: { shape: 'kitty' } }));
+  await act(async () => { pending.resolve(value()); });
+  pending = null;
+  assert.equal(renderer.root.findByType(DsBotPicker).props.value, 'ds-two');
+  assert.equal(renderer.root.findByType('select').props.value, otherKey);
+  assert.equal(renderer.root.findByProps({ role: 'combobox' }).props['aria-expanded'], true);
+  const row = renderer.root.findByType('li');
+  assert.match(text(row), /stepBot renamed/);
+  assert.deepEqual(row.findByType(DsBotAvatar).props.bot, currentBots[0]);
+  assert.match(text(renderer.root.findByProps({ role: 'option' })), /ImBot renamed/);
+  assert.deepEqual(renderer.root.findByProps({ role: 'combobox' }).findByType(DsBotAvatar).props.bot, currentBots[1]);
+  pending = Promise.withResolvers();
+  await act(async () => globalThis.window.dispatchEvent(new Event('focus')));
+  assert.equal(calls, 3, 'returning to the window reads immediately');
+  await act(async () => pending.reject(new Error('temporary outage')));
+  pending = null;
+  assert.match(text(renderer.root.findByType('li')), /stepBot renamed/, 'background failures retain the usable form');
+  globalThis.document.hidden = true;
+  await act(async () => t.mock.timers.tick(3_000));
+  assert.equal(calls, 3, 'hidden settings do not poll');
+  globalThis.document.hidden = false;
+  await act(async () => globalThis.document.dispatchEvent(new Event('visibilitychange')));
+  assert.equal(calls, 4);
+  act(() => renderer.unmount());
+  await act(async () => {
+    globalThis.window.dispatchEvent(new Event('focus'));
+    t.mock.timers.tick(6_000);
+  });
+  assert.equal(calls, 4, 'unmount removes timers and focus listeners');
+});
+
+test('a stale background read cannot undo a saved binding', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const stale = Promise.withResolvers();
+  let reads = 0;
+  let binding;
+  const value = () => ({ state: 'ready', bots, conversations: [{ conversationKey: key, address: 'private-one', dsBotId: binding }] });
+  let renderer;
+  await act(async () => { renderer = create(React.createElement(DsBotSettingsPage, {
+    botId: 'im-one', rpcCall: async (endpoint, payload) => {
+      if (endpoint === 'ds-bot.bind') { binding = payload.dsBotId; return {}; }
+      assert.equal(endpoint, 'ds-bot.status');
+      if (++reads === 2) return stale.promise;
+      return value();
+    },
+  })); });
+  t.after(() => act(() => renderer.unmount()));
+  await act(async () => renderer.root.findByType(DsBotPicker).props.onChange('ds-one'));
+  await act(async () => renderer.root.findByType('select').props.onChange({ target: { value: key } }));
+  const oldValue = value();
+  await act(async () => t.mock.timers.tick(3_000));
+  await act(async () => renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }));
+  assert.match(text(renderer.root.findByType('li')), /stepBot.*已绑定/);
+  await act(async () => stale.resolve(oldValue));
+  assert.match(text(renderer.root.findByType('li')), /stepBot.*已绑定/);
+  assert.equal(renderer.root.findByType('select').props.disabled, true);
+});
+
 test('no remaining bots disables the picker without creating an empty listbox', async () => {
   let renderer;
   await act(async () => { renderer = create(React.createElement(DsBotPicker, {
