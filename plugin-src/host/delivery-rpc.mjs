@@ -4,6 +4,7 @@ import { resolveRpcAuthority } from './rpc-authority.mjs';
 export const DELIVERY_RPC_CHANNEL = '/dsh-im-delivery';
 export const DELIVERY_TEST_MESSAGE = 'DSH-IM 主动投递测试成功。';
 export const DELIVERY_ENDPOINTS = Object.freeze({
+  listDsBotSessions: 'ds-bot.sessions.list',
   dsBotStatus: 'ds-bot.status',
   bindDsBot: 'ds-bot.bind',
   unbindDsBot: 'ds-bot.unbind',
@@ -77,6 +78,7 @@ function validDraftTarget(value) {
 
 function validPayload(endpoint, payload) {
   if (!ENDPOINTS.has(endpoint) || !isRecord(payload)) return false;
+  if (endpoint === DELIVERY_ENDPOINTS.listDsBotSessions) return exactKeys(payload, []);
   if (endpoint === DELIVERY_ENDPOINTS.send) {
     return (exactKeys(payload, ['botId', 'targetId', 'text'])
         || (exactKeys(payload, ['botId', 'targetId', 'text', 'format'])
@@ -151,7 +153,9 @@ export function createDeliveryRpcHandler(service) {
     }
     try {
       let value;
-      if (endpoint === DELIVERY_ENDPOINTS.dsBotStatus) {
+      if (endpoint === DELIVERY_ENDPOINTS.listDsBotSessions) {
+        value = await service.listDsBotSessions();
+      } else if (endpoint === DELIVERY_ENDPOINTS.dsBotStatus) {
         value = await service.dsBotStatus(payload.botId);
       } else if (endpoint === DELIVERY_ENDPOINTS.bindDsBot) {
         value = await service.bindDsBot(payload.botId, payload.conversationKey, payload.dsBotId);

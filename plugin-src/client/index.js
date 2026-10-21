@@ -80,6 +80,7 @@ import {
 } from './loopback-recovery.js';
 import { installImStyles } from './styles.js';
 import { installSessionChannelLogos } from './session-channel-logos.js';
+import { installDsBotSessionAvatars } from './ds-bot-session-avatars.js';
 import { UpdatePanel, UPDATE_RPC_CHANNEL } from './update-panel.js';
 import { WorkspaceDirectoryPickerContext } from './workspace-editor.js';
 import { IMPanelErrorBoundary } from './panel-error-boundary.js';
@@ -470,6 +471,14 @@ export function apply(ctx) {
   );
 
   ctx.effect(() => installSessionChannelLogos(), 'im-settings: Session channel logos');
+  let dsBotAvatars;
+  ctx.effect(() => {
+    dsBotAvatars = installDsBotSessionAvatars(ctx, {
+      rpcCall: (endpoint, payload, signal) =>
+        callManagementRpc(ctx.connection, DELIVERY_RPC_CHANNEL, endpoint, payload, signal),
+    });
+    return () => { dsBotAvatars.dispose(); dsBotAvatars = null; };
+  }, 'im-settings: bound DS Bot session avatars');
 
   ctx.effect(() => {
     const disposers = [
@@ -497,6 +506,7 @@ export function apply(ctx) {
   const managementRpc = async (connection, channel, endpoint, payload, signal) => {
     const result = await callManagementRpc(connection, channel, endpoint, payload, signal);
     if (result?.ok === true) {
+      if (channel === DELIVERY_RPC_CHANNEL && endpoint.startsWith('ds-bot.')) dsBotAvatars?.refresh();
       if (endpoint === SIDEBAR_SETTINGS_ENDPOINTS.set) sidebarSync?.apply(result);
       else if (endpoint !== SIDEBAR_SETTINGS_ENDPOINTS.get) sidebarSync?.refresh();
     }

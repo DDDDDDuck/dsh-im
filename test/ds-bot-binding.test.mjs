@@ -305,3 +305,30 @@ test('RPC validates the binding payload; remote harness cannot bind a local DS B
   const status = await rpc('ds-bot.status', { botId: 'im-one' });
   assert.deepEqual(status.value.bots, [{ id: bot.id, name: bot.name }]);
 });
+
+test('sidebar avatars expose only bound current sessions, follow rollover and disappear on unbind', async (t) => {
+  const f = await fixture(t);
+  const rpc = createDeliveryRpcHandler(f.service);
+  let reads = 0;
+  const status = f.dsBot.status;
+  f.dsBot.status = () => { reads++; return status(); };
+  assert.deepEqual(await f.service.listDsBotSessions(), []);
+  assert.equal(reads, 0, 'unbound installations need no DS Bot request');
+  await f.service.bindDsBot('im-one', f.key, bot.id);
+  const appearance = { id: bot.id, name: bot.name, color: 'red', avatar: { shape: 'whale' } };
+  f.setCurrent({ ...appearance, sessionId: 'current', parts: ['history'], secret: 'private' });
+  assert.deepEqual(await rpc('ds-bot.sessions.list', {}), {
+    ok: true, value: [{ sessionId: 'current', bot: appearance }],
+  });
+  assert.equal((await rpc('ds-bot.sessions.list', { botId: 'im-one' })).error.code, 'bad-request');
+  f.setCurrent({ ...appearance, sessionId: 'next', parts: ['current', 'history'] });
+  assert.deepEqual(await f.service.listDsBotSessions(), [{ sessionId: 'next', bot: appearance }]);
+  const remote = new DeliveryService({ dsBot: f.dsBot, unavailableSessionSyncChannels: ['qq'] });
+  remote.registerAdapter(f.adapter);
+  assert.deepEqual(await remote.listDsBotSessions(), []);
+  f.dsBot.status = async () => ({ state: 'disabled', bots: [] });
+  assert.deepEqual(await f.service.listDsBotSessions(), []);
+  f.dsBot.status = status;
+  await f.service.unbindDsBot('im-one', f.key);
+  assert.deepEqual(await f.service.listDsBotSessions(), []);
+});
