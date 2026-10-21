@@ -82,48 +82,29 @@ export function DsBotSettingsPage({ botId, rpcCall }) {
   const [busy, setBusy] = React.useState(false);
   const [feedback, setFeedback] = React.useState(null);
   const [feedbackTone, setFeedbackTone] = React.useState('success');
-  const requests = React.useRef({ revision: 0, pending: 0, busy: false, controller: null });
-  const refresh = React.useCallback(async (signal = requests.current.controller?.signal, silent = false) => {
+  const requests = React.useRef({ revision: 0, busy: false, controller: null });
+  const refresh = React.useCallback(async (signal = requests.current.controller?.signal) => {
     const state = requests.current;
-    if (signal?.aborted || (silent && (state.pending || state.busy))) return;
+    if (signal?.aborted) return;
     const revision = ++state.revision;
-    state.pending++;
     const current = () => !signal?.aborted && revision === state.revision;
-    if (!silent) setLoading(true);
+    setLoading(true);
     try {
       const value = await rpcCall('ds-bot.status', { botId }, signal);
       if (current()) setStatus(value);
     } catch {
-      // A background read must not interrupt an open picker or an unsaved form.
-      if (current() && !silent) setStatus((previous) => ({ ...previous, state: 'unavailable' }));
+      if (current()) setStatus((previous) => ({ ...previous, state: 'unavailable' }));
     } finally {
-      state.pending--;
-      if (current() && !silent) setLoading(false);
+      if (current()) setLoading(false);
     }
   }, [botId, rpcCall]);
   React.useEffect(() => {
     const controller = new AbortController();
     requests.current.controller = controller;
-    let timer;
-    const schedule = () => {
-      clearTimeout(timer);
-      if (!controller.signal.aborted) timer = setTimeout(poll, 3_000);
-    };
-    const poll = async () => {
-      clearTimeout(timer);
-      if (!globalThis.document?.hidden) await refresh(controller.signal, true);
-      schedule();
-    };
-    const wake = () => { if (!globalThis.document?.hidden) void poll(); };
-    globalThis.window?.addEventListener('focus', wake);
-    globalThis.document?.addEventListener('visibilitychange', wake);
-    void refresh(controller.signal).finally(schedule);
+    void refresh(controller.signal);
     return () => {
       controller.abort();
       requests.current.revision++;
-      clearTimeout(timer);
-      globalThis.window?.removeEventListener('focus', wake);
-      globalThis.document?.removeEventListener('visibilitychange', wake);
     };
   }, [refresh]);
   const conversations = status?.conversations ?? [];
