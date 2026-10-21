@@ -82,21 +82,49 @@ export function DsBotSettingsPage({ botId, rpcCall }) {
   const [busy, setBusy] = React.useState(false);
   const [feedback, setFeedback] = React.useState(null);
   const [feedbackTone, setFeedbackTone] = React.useState('success');
-  const refresh = React.useCallback(async (signal) => {
-    setLoading(true);
+  const requests = React.useRef({ revision: 0, pending: 0, busy: false, controller: null });
+  const refresh = React.useCallback(async (signal = requests.current.controller?.signal, silent = false) => {
+    const state = requests.current;
+    if (signal?.aborted || (silent && (state.pending || state.busy))) return;
+    const revision = ++state.revision;
+    state.pending++;
+    const current = () => !signal?.aborted && revision === state.revision;
+    if (!silent) setLoading(true);
     try {
       const value = await rpcCall('ds-bot.status', { botId }, signal);
-      if (!signal?.aborted) setStatus(value);
+      if (current()) setStatus(value);
     } catch {
-      if (!signal?.aborted) setStatus((previous) => ({ ...previous, state: 'unavailable' }));
+      // A background read must not interrupt an open picker or an unsaved form.
+      if (current() && !silent) setStatus((previous) => ({ ...previous, state: 'unavailable' }));
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      state.pending--;
+      if (current() && !silent) setLoading(false);
     }
   }, [botId, rpcCall]);
   React.useEffect(() => {
     const controller = new AbortController();
-    void refresh(controller.signal);
-    return () => controller.abort();
+    requests.current.controller = controller;
+    let timer;
+    const schedule = () => {
+      clearTimeout(timer);
+      if (!controller.signal.aborted) timer = setTimeout(poll, 3_000);
+    };
+    const poll = async () => {
+      clearTimeout(timer);
+      if (!globalThis.document?.hidden) await refresh(controller.signal, true);
+      schedule();
+    };
+    const wake = () => { if (!globalThis.document?.hidden) void poll(); };
+    globalThis.window?.addEventListener('focus', wake);
+    globalThis.document?.addEventListener('visibilitychange', wake);
+    void refresh(controller.signal).finally(schedule);
+    return () => {
+      controller.abort();
+      requests.current.revision++;
+      clearTimeout(timer);
+      globalThis.window?.removeEventListener('focus', wake);
+      globalThis.document?.removeEventListener('visibilitychange', wake);
+    };
   }, [refresh]);
   const conversations = status?.conversations ?? [];
   const bots = status?.bots ?? [];
@@ -113,7 +141,9 @@ export function DsBotSettingsPage({ botId, rpcCall }) {
   }, [status]);
   const save = async (event) => {
     event.preventDefault();
-    if (!canSave) return;
+    if (!canSave || requests.current.busy) return;
+    requests.current.busy = true;
+    requests.current.revision++;
     setBusy(true); setFeedback(null);
     try {
       await rpcCall('ds-bot.bind', { botId, conversationKey, dsBotId });
@@ -123,9 +153,12 @@ export function DsBotSettingsPage({ botId, rpcCall }) {
     } catch (error) {
       if (error?.code === 'ds-bot-binding-conflict') await refresh();
       setFeedbackTone('error'); setFeedback(dsBotErrorMessage(error));
-    } finally { setBusy(false); }
+    } finally { requests.current.busy = false; setBusy(false); }
   };
   const unbind = async (key) => {
+    if (requests.current.busy) return;
+    requests.current.busy = true;
+    requests.current.revision++;
     setBusy(true); setFeedback(null);
     try {
       await rpcCall('ds-bot.unbind', { botId, conversationKey: key });
@@ -133,7 +166,7 @@ export function DsBotSettingsPage({ botId, rpcCall }) {
       setFeedbackTone('success'); setFeedback('已解除绑定，聊天记录保留。');
     } catch (error) {
       setFeedbackTone('error'); setFeedback(dsBotErrorMessage(error));
-    } finally { setBusy(false); }
+    } finally { requests.current.busy = false; setBusy(false); }
   };
   return h('section', { className: 'dim-deliveryTargets dim-dsBotSettings', 'aria-label': '绑定bot' },
     h('div', { className: 'dim-deliverySectionHeading' },

@@ -506,9 +506,10 @@ export function apply(ctx) {
   const managementRpc = async (connection, channel, endpoint, payload, signal) => {
     const result = await callManagementRpc(connection, channel, endpoint, payload, signal);
     if (result?.ok === true) {
-      if (channel === DELIVERY_RPC_CHANNEL && endpoint.startsWith('ds-bot.')) dsBotAvatars?.refresh();
+      const dsBotRead = channel === DELIVERY_RPC_CHANNEL && endpoint === 'ds-bot.status';
+      if (channel === DELIVERY_RPC_CHANNEL && ['ds-bot.bind', 'ds-bot.unbind'].includes(endpoint)) dsBotAvatars?.refresh();
       if (endpoint === SIDEBAR_SETTINGS_ENDPOINTS.set) sidebarSync?.apply(result);
-      else if (endpoint !== SIDEBAR_SETTINGS_ENDPOINTS.get) sidebarSync?.refresh();
+      else if (!dsBotRead && endpoint !== SIDEBAR_SETTINGS_ENDPOINTS.get) sidebarSync?.refresh();
     }
     return result;
   };

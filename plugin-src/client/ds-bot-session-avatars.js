@@ -7,7 +7,7 @@ export const DS_BOT_SESSIONS_ENDPOINT = 'ds-bot.sessions.list';
  * One shared read covers every row; no title matching or per-row requests. */
 export function installDsBotSessionAvatars(ctx, {
   rpcCall, setTimeoutFn = globalThis.setTimeout, clearTimeoutFn = globalThis.clearTimeout,
-  pollMs = 30_000,
+  pollMs = 3_000, document = globalThis.document, window = globalThis.window,
 }) {
   let refresh = () => {};
   const stop = ctx.slots.inject('sidebar.session.row.leading', () => {
@@ -49,13 +49,16 @@ export function installDsBotSessionAvatars(ctx, {
         if (!abort.signal.aborted && current === revision) publish([]);
       } finally {
         running = false;
-        schedule(current === revision ? pollMs : 0);
+        schedule(current === revision ? (document?.hidden ? 30_000 : pollMs) : 0);
       }
     };
     refresh = () => {
       revision++;
       if (!running) schedule(0);
     };
+    const wake = () => { if (!document?.hidden) refresh(); };
+    window?.addEventListener('focus', wake);
+    document?.addEventListener('visibilitychange', wake);
     const unregister = ctx.slots.register({
       name: 'sidebar.session.row.leading', id: 'dsh-im-ds-bot-avatar', order: 0,
     }, SessionAvatar);
@@ -63,6 +66,8 @@ export function installDsBotSessionAvatars(ctx, {
     return () => {
       abort.abort();
       clearTimeoutFn(timer);
+      window?.removeEventListener('focus', wake);
+      document?.removeEventListener('visibilitychange', wake);
       refresh = () => {};
       unregister();
       listeners.clear();

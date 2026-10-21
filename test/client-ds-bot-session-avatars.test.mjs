@@ -5,7 +5,7 @@ import { act, create } from 'react-test-renderer';
 import { installDsBotSessionAvatars } from '../plugin-src/client/ds-bot-session-avatars.js';
 import { DsBotAvatar } from '../plugin-src/client/ds-bot-avatar.js';
 
-function fixture(t, rpcCall) {
+function fixture(t, rpcCall, options = {}) {
   let install, cleanup, component;
   let registered = false;
   const timers = new Map();
@@ -26,6 +26,7 @@ function fixture(t, rpcCall) {
     rpcCall,
     setTimeoutFn: (callback, delay) => { const key = {}; timers.set(key, { callback, delay }); return key; },
     clearTimeoutFn: (key) => timers.delete(key),
+    ...options,
   });
   t.after(() => controller.dispose());
   return {
@@ -66,7 +67,7 @@ test('native leading slot uses the original Bot avatar by session id and refresh
   assert.equal(calls, 1);
   assert.equal(avatars().length, 1);
   assert.deepEqual(avatars()[0].props, { bot, size: 16 });
-  assert.equal([...f.timers.values()][0].delay, 30_000);
+  assert.equal([...f.timers.values()][0].delay, 3_000);
   entries = [{ sessionId: 'next', bot: { ...bot, color: 'violet' } }];
   await act(async () => { f.controller.refresh(); assert.equal(await f.runTimer(), 0); });
   assert.equal(avatars().length, 1);
@@ -86,6 +87,32 @@ test('native leading slot uses the original Bot avatar by session id and refresh
   assert.equal(f.timers.size, 0);
   await act(async () => { f.declare(true); renderer = create(render()); });
   assert.equal(f.registered, true, 'slot re-declaration installs one fresh subscription');
+});
+
+test('sidebar automatically follows name and logo changes, with focus and visibility refresh', async (t) => {
+  const document = Object.assign(new EventTarget(), { hidden: false });
+  const window = new EventTarget();
+  let bot = { id: 'ds-one', name: 'Before', color: 'red', avatar: { shape: 'whale' } };
+  const f = fixture(t, async () => ({ ok: true, value: [{ sessionId: 'bound', bot }] }), { document, window });
+  await act(async () => f.declare(true));
+  let renderer;
+  await act(async () => { renderer = create(React.createElement(f.component, { sessionId: 'bound' })); });
+  t.after(() => act(() => renderer.unmount()));
+  bot = { ...bot, name: 'After', color: 'green', avatar: { shape: 'kitty' } };
+  await act(async () => { assert.equal(await f.runTimer(), 3_000); });
+  assert.deepEqual(renderer.root.findByType(DsBotAvatar).props.bot, bot);
+  window.dispatchEvent(new Event('focus'));
+  await act(async () => { assert.equal(await f.runTimer(), 0); });
+  document.hidden = true;
+  await act(async () => { await f.runTimer(); });
+  assert.equal([...f.timers.values()][0].delay, 30_000);
+  document.hidden = false;
+  document.dispatchEvent(new Event('visibilitychange'));
+  await act(async () => { assert.equal(await f.runTimer(), 0); });
+  act(() => f.controller.dispose());
+  window.dispatchEvent(new Event('focus'));
+  document.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(f.timers.size, 0);
 });
 
 test('refresh discards in-flight stale binding data and disposal aborts pending reads', async (t) => {
