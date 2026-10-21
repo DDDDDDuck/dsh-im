@@ -53,7 +53,7 @@
 > [!IMPORTANT]
 > **Install using the full package name: `@xmanrui/dsh-im`**
 >
-> To avoid name confusion, copy the full package name **`@xmanrui/dsh-im`** when searching the plugin marketplace, entering it in the plugin installer, or installing from the command line. The author is **xmanrui**.
+> To avoid name confusion, copy the full package name **`@xmanrui/dsh-im`** when searching the plugin marketplace, entering it in the plugin installer, or installing from the command line.
 >
 > **DSH Desktop**: run in the current Desktop application's built-in terminal:
 >
