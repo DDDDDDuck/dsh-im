@@ -7,7 +7,7 @@ export const DS_BOT_SESSIONS_ENDPOINT = 'ds-bot.sessions.list';
  * One shared read covers every row; no title matching or per-row requests. */
 export function installDsBotSessionAvatars(ctx, {
   rpcCall, setTimeoutFn = globalThis.setTimeout, clearTimeoutFn = globalThis.clearTimeout,
-  pollMs = 3_000, document = globalThis.document, window = globalThis.window,
+  document = globalThis.document, window = globalThis.window,
 }) {
   let refresh = () => {};
   const stop = ctx.slots.inject('sidebar.session.row.leading', () => {
@@ -33,9 +33,9 @@ export function installDsBotSessionAvatars(ctx, {
       const bot = React.useSyncExternalStore(subscribe, () => bots.get(sessionId) ?? null);
       return bot ? React.createElement(DsBotAvatar, { bot, size: 16 }) : null;
     }
-    const schedule = (delay) => {
+    const schedule = () => {
       clearTimeoutFn(timer);
-      if (!abort.signal.aborted) timer = setTimeoutFn(load, delay);
+      if (!abort.signal.aborted) timer = setTimeoutFn(load, 0);
     };
     const load = async () => {
       if (abort.signal.aborted || running) return;
@@ -49,12 +49,12 @@ export function installDsBotSessionAvatars(ctx, {
         if (!abort.signal.aborted && current === revision) publish([]);
       } finally {
         running = false;
-        schedule(current === revision ? (document?.hidden ? 30_000 : pollMs) : 0);
+        if (current !== revision) schedule();
       }
     };
     refresh = () => {
       revision++;
-      if (!running) schedule(0);
+      if (!running) schedule();
     };
     const wake = () => { if (!document?.hidden) refresh(); };
     window?.addEventListener('focus', wake);
