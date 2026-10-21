@@ -48,6 +48,27 @@
 >
 > This project is independently developed and maintained by community developers.
 
+<!-- -->
+
+> [!IMPORTANT]
+> **Install using the full package name: `@xmanrui/dsh-im`**
+>
+> To avoid name confusion, copy the full package name **`@xmanrui/dsh-im`** when searching the plugin marketplace, entering it in the plugin installer, or installing from the command line. The author is **xmanrui**.
+>
+> **DSH Desktop**: run in the current Desktop application's built-in terminal:
+>
+> ```sh
+> dsh plugin --profile desktop add -w @xmanrui/dsh-im
+> ```
+>
+> **DSH Web**: run in the terminal environment used to start the current Harness:
+>
+> ```sh
+> dsh plugin --profile web add -w @xmanrui/dsh-im
+> ```
+>
+> After installation, restart DSH Desktop or `dsh web` as appropriate (also refresh the browser for Web), then open **Settings → IM Bot**.
+
 ## Introduction
 
 Connect IM bots to DeepSeek Harness by scanning a QR code, using an App Manifest, or entering existing bot credentials, and let the local Harness connect outward to a public AI Office. One plugin and one settings entry manage the built-in IM channels and the AI Office Connector. iMessage uses one native Messages.app identity per macOS user account; see the [iMessage channel notes](docs/imessage.md).
@@ -128,13 +149,25 @@ After the model calls the file-return tool, the plugin hands the specified file 
 
 ## Installation
 
-Install the published stable release from npm (recommended):
+Install the published stable release of **`@xmanrui/dsh-im`** from npm (recommended). Choose the command for the application you use:
+
+**DSH Desktop**: run in the current Desktop application's built-in terminal:
+
+```sh
+dsh plugin --profile desktop add -w @xmanrui/dsh-im
+```
+
+Restart DSH Desktop after installation.
+
+**DSH Web**: run in the terminal environment used to start the current Harness:
 
 ```sh
 dsh plugin --profile web add -w @xmanrui/dsh-im
 ```
 
-Restart `dsh web`, refresh the browser, then open **Settings → IM Bot**. The top-level IM Bot entry uses `order: 21` to follow **Agent Presets**, and the Plugins page no longer retains the old entry. Upgrading preserves existing bots, credentials, workspaces, Agent Presets, and Session bindings.
+Restart `dsh web` and refresh the browser after installation.
+
+After restarting, open **Settings → IM Bot**. The top-level IM Bot entry uses `order: 21` to follow **Agent Presets**, and the Plugins page no longer retains the old entry. Upgrading preserves existing bots, credentials, workspaces, Agent Presets, and Session bindings.
 
 Local `dsh web` and DSH Desktop reuse the current Host's internal services by default: the Typert Gateway invokes the Session and Workspace controllers. No Harness address or loopback HTTP connection is required. Desktop's compatibility, extended-window, and advanced modes do not require browser access or LAN access to be enabled. An explicit channel `harnessBaseUrl` is retained only for legacy remote HTTP/WebSocket Harness endpoints; failed internal calls never silently switch to another Host.
 
