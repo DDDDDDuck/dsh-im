@@ -54,7 +54,7 @@ test('native leading slot uses the original Bot avatar by session id and refresh
     assert.deepEqual(payload, {});
     return fail ? { ok: false } : { ok: true, value: entries };
   });
-  assert.equal(calls, 0, 'older Hosts with no leading slot do not poll');
+  assert.equal(calls, 0, 'older Hosts with no leading slot do not read');
   await act(async () => f.declare(true));
   let renderer;
   const render = () => React.createElement(React.Fragment, null,
@@ -67,17 +67,19 @@ test('native leading slot uses the original Bot avatar by session id and refresh
   assert.equal(calls, 1);
   assert.equal(avatars().length, 1);
   assert.deepEqual(avatars()[0].props, { bot, size: 16 });
-  assert.equal([...f.timers.values()][0].delay, 3_000);
+  assert.equal(f.timers.size, 0, 'loading does not schedule periodic reads');
   entries = [{ sessionId: 'next', bot: { ...bot, color: 'violet' } }];
   await act(async () => { f.controller.refresh(); assert.equal(await f.runTimer(), 0); });
   assert.equal(avatars().length, 1);
   assert.equal(avatars()[0].parent.props.sessionId, 'next');
   assert.equal(avatars()[0].props.bot.color, 'violet');
+  assert.equal(f.timers.size, 0);
   fail = true;
-  await act(async () => { await f.runTimer(); });
+  await act(async () => { f.controller.refresh(); await f.runTimer(); });
   assert.equal(avatars().length, 0, 'an unavailable provider must not retain stale avatars');
+  assert.equal(f.timers.size, 0, 'failed reads do not start a retry loop');
   fail = false;
-  await act(async () => { await f.runTimer(); });
+  await act(async () => { f.controller.refresh(); await f.runTimer(); });
   assert.equal(avatars().length, 1);
   entries = [];
   await act(async () => { f.controller.refresh(); await f.runTimer(); });
@@ -89,30 +91,46 @@ test('native leading slot uses the original Bot avatar by session id and refresh
   assert.equal(f.registered, true, 'slot re-declaration installs one fresh subscription');
 });
 
-test('sidebar automatically follows name and logo changes, with focus and visibility refresh', async (t) => {
+test('sidebar refreshes on return to DSH and never schedules periodic checks', async (t) => {
   const document = Object.assign(new EventTarget(), { hidden: false });
   const window = new EventTarget();
   let bot = { id: 'ds-one', name: 'Before', color: 'red', avatar: { shape: 'whale' } };
-  const f = fixture(t, async () => ({ ok: true, value: [{ sessionId: 'bound', bot }] }), { document, window });
+  let calls = 0;
+  const f = fixture(t, async () => {
+    calls++;
+    return { ok: true, value: [{ sessionId: 'bound', bot }] };
+  }, { document, window });
   await act(async () => f.declare(true));
   let renderer;
   await act(async () => { renderer = create(React.createElement(f.component, { sessionId: 'bound' })); });
   t.after(() => act(() => renderer.unmount()));
+  assert.equal(calls, 1);
+  assert.equal(f.timers.size, 0, 'no periodic checks while the window stays visible');
   bot = { ...bot, name: 'After', color: 'green', avatar: { shape: 'kitty' } };
-  await act(async () => { assert.equal(await f.runTimer(), 3_000); });
-  assert.deepEqual(renderer.root.findByType(DsBotAvatar).props.bot, bot);
+  assert.equal(renderer.root.findByType(DsBotAvatar).props.bot.name, 'Before');
   window.dispatchEvent(new Event('focus'));
   await act(async () => { assert.equal(await f.runTimer(), 0); });
+  assert.deepEqual(renderer.root.findByType(DsBotAvatar).props.bot, bot);
+  assert.equal(calls, 2);
+  assert.equal(f.timers.size, 0, 'returning refreshes once without starting a loop');
   document.hidden = true;
-  await act(async () => { await f.runTimer(); });
-  assert.equal([...f.timers.values()][0].delay, 30_000);
+  document.dispatchEvent(new Event('visibilitychange'));
+  window.dispatchEvent(new Event('focus'));
+  assert.equal(f.timers.size, 0, 'hidden windows do not schedule checks');
+  assert.equal(calls, 2);
+  bot = { ...bot, name: 'Returned', color: 'violet' };
   document.hidden = false;
   document.dispatchEvent(new Event('visibilitychange'));
+  window.dispatchEvent(new Event('focus'));
   await act(async () => { assert.equal(await f.runTimer(), 0); });
+  assert.deepEqual(renderer.root.findByType(DsBotAvatar).props.bot, bot);
+  assert.equal(calls, 3, 'simultaneous return events share one read');
+  assert.equal(f.timers.size, 0);
   act(() => f.controller.dispose());
   window.dispatchEvent(new Event('focus'));
   document.dispatchEvent(new Event('visibilitychange'));
   assert.equal(f.timers.size, 0);
+  assert.equal(calls, 3);
 });
 
 test('refresh discards in-flight stale binding data and disposal aborts pending reads', async (t) => {
