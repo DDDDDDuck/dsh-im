@@ -51,9 +51,13 @@
 <!-- -->
 
 > [!IMPORTANT]
-> **Install using the full package name: `@xmanrui/dsh-im`**
+> **Install using the full package name:**
 >
-> To avoid name confusion, copy the full package name **`@xmanrui/dsh-im`** when searching the plugin marketplace, entering it in the plugin installer, or installing from the command line.
+> ```text
+> @xmanrui/dsh-im
+> ```
+>
+> To avoid name confusion, copy the full package name above when searching the plugin marketplace, entering it in the plugin installer, or installing from the command line.
 >
 > Choose one command: use **Desktop**'s built-in terminal or the terminal used to start the current Harness for **Web**.
 >
