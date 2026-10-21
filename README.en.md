@@ -55,19 +55,9 @@
 >
 > To avoid name confusion, copy the full package name **`@xmanrui/dsh-im`** when searching the plugin marketplace, entering it in the plugin installer, or installing from the command line.
 >
-> **DSH Desktop**: run in the current Desktop application's built-in terminal:
->
-> ```sh
-> dsh plugin --profile desktop add -w @xmanrui/dsh-im
-> ```
->
-> **DSH Web**: run in the terminal environment used to start the current Harness:
->
-> ```sh
-> dsh plugin --profile web add -w @xmanrui/dsh-im
-> ```
->
-> After installation, restart DSH Desktop or `dsh web` as appropriate (also refresh the browser for Web), then open **Settings → IM Bot**.
+> **DSH Desktop** (built-in terminal): `dsh plugin --profile desktop add -w @xmanrui/dsh-im`<br>
+> **DSH Web** (terminal used to start the current Harness): `dsh plugin --profile web add -w @xmanrui/dsh-im`<br>
+> Restart Desktop or `dsh web`, refresh the browser for Web, then open **Settings → IM Bot**.
 
 ## Introduction
 
