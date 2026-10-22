@@ -178,6 +178,18 @@ export class TelegramApi {
     return this.#call('getWebhookInfo', {}, options);
   }
 
+  /**
+   * Look a chat up by numeric id, `@username` or an invite link.
+   *
+   * The settings page uses this to turn a pasted group reference into a chat
+   * id; the bot must already be able to see the chat for the lookup to work.
+   */
+  async getChat({ chatId, signal } = {}) {
+    const id = cleanString(chatId);
+    if (!id || id.length > 512) throw new TypeError('Telegram chat id is invalid');
+    return this.#call('getChat', { chat_id: id }, { signal });
+  }
+
   async getUpdates({ offset, timeout = 25, signal } = {}) {
     const payload = {
       timeout,
@@ -390,6 +402,15 @@ export class TelegramApi {
         text,
         link_preview_options: { is_disabled: true },
       }),
+    }, { signal });
+  }
+
+  /** Telegram notifies on new messages only, never on edits, so dropping the
+   *  progress placeholder takes a delete rather than a rewrite. */
+  async deleteMessage({ chatId, messageId, signal }) {
+    return this.#call('deleteMessage', {
+      chat_id: chatId,
+      message_id: messageId,
     }, { signal });
   }
 

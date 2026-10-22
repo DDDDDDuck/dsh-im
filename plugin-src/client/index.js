@@ -80,11 +80,12 @@ import {
 } from './loopback-recovery.js';
 import { installImStyles } from './styles.js';
 import { installSessionChannelLogos } from './session-channel-logos.js';
+import { installDsBotSessionAvatars } from './ds-bot-session-avatars.js';
 import { UpdatePanel, UPDATE_RPC_CHANNEL } from './update-panel.js';
 import { WorkspaceDirectoryPickerContext } from './workspace-editor.js';
 import { IMPanelErrorBoundary } from './panel-error-boundary.js';
 import { installImPluginPage } from './plugin-page.js';
-import { installSidebarVisibilitySync, SIDEBAR_SETTINGS_ENDPOINTS } from './sidebar-settings.js';
+import { installSidebarVisibilitySync, SIDEBAR_SETTINGS_ENDPOINTS, SIDEBAR_SETTINGS_RPC_CHANNEL } from './sidebar-settings.js';
 
 export const name = 'im-settings';
 export const inject = ['slots', 'connection', 'locale', 'workspaces'];
@@ -470,6 +471,14 @@ export function apply(ctx) {
   );
 
   ctx.effect(() => installSessionChannelLogos(), 'im-settings: Session channel logos');
+  let dsBotAvatars;
+  ctx.effect(() => {
+    dsBotAvatars = installDsBotSessionAvatars(ctx, {
+      rpcCall: (endpoint, payload, signal) =>
+        callManagementRpc(ctx.connection, DELIVERY_RPC_CHANNEL, endpoint, payload, signal),
+    });
+    return () => { dsBotAvatars.dispose(); dsBotAvatars = null; };
+  }, 'im-settings: bound DS Bot session avatars');
 
   ctx.effect(() => {
     const disposers = [
@@ -497,8 +506,10 @@ export function apply(ctx) {
   const managementRpc = async (connection, channel, endpoint, payload, signal) => {
     const result = await callManagementRpc(connection, channel, endpoint, payload, signal);
     if (result?.ok === true) {
+      const dsBotRead = channel === DELIVERY_RPC_CHANNEL && endpoint === 'ds-bot.status';
+      if (channel === DELIVERY_RPC_CHANNEL && ['ds-bot.bind', 'ds-bot.unbind'].includes(endpoint)) dsBotAvatars?.refresh();
       if (endpoint === SIDEBAR_SETTINGS_ENDPOINTS.set) sidebarSync?.apply(result);
-      else if (endpoint !== SIDEBAR_SETTINGS_ENDPOINTS.get) sidebarSync?.refresh();
+      else if (!dsBotRead && endpoint !== SIDEBAR_SETTINGS_ENDPOINTS.get) sidebarSync?.refresh();
     }
     return result;
   };
@@ -535,7 +546,8 @@ export function apply(ctx) {
   const deliveryRpcCall = (endpoint, payload, signal) =>
     managementRpc(ctx.connection, DELIVERY_RPC_CHANNEL, endpoint, payload, signal);
   const globalSettingsRpcCall = (endpoint, payload, signal) =>
-    managementRpc(ctx.connection, GLOBAL_SETTINGS_RPC_CHANNEL, endpoint, payload, signal);
+    managementRpc(ctx.connection, Object.values(SIDEBAR_SETTINGS_ENDPOINTS).includes(endpoint)
+      ? SIDEBAR_SETTINGS_RPC_CHANNEL : GLOBAL_SETTINGS_RPC_CHANNEL, endpoint, payload, signal);
   const workspaceDirectoryPicker = Object.freeze({
     listDirectory: (path, signal) =>
       callWorkspaceDirectoryApi(ctx, 'listDirectory', path, signal),
@@ -585,7 +597,7 @@ export function apply(ctx) {
   ctx.effect(() => {
     sidebarSync = installSidebarVisibilitySync({
       rpcCall: (endpoint, payload, signal) =>
-        callManagementRpc(ctx.connection, GLOBAL_SETTINGS_RPC_CHANNEL, endpoint, payload, signal),
+        callManagementRpc(ctx.connection, SIDEBAR_SETTINGS_RPC_CHANNEL, endpoint, payload, signal),
       setVisible: (visible) => pluginPage.setSidebarVisible(visible),
     });
     return () => { sidebarSync.dispose(); sidebarSync = null; };

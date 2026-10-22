@@ -4,12 +4,16 @@ import { extractConnectionEvidence, createConnectionDiagnostics, atConnectionSta
 import { createEditableMessageStream } from '../shared/editable-message-stream.mjs';
 import { createTextDeliveryBlock } from '../shared/semantic/delivery.mjs';
 import { t } from '../shared/i18n.mjs';
+import { groupTriggerAddressed, normalizeGroupTriggers } from './group-triggers.mjs';
 import { captureContextEnhancement } from '../shared/context-enhancement.mjs';
 import { recoverAssistantTextByTimestamp } from '../shared/session-reply-recovery.mjs';
 import { SHARED_COMMAND_CATALOG, commandsForChannel } from '../shared/command-catalog.mjs';
 import { COMMANDS_MENU_BUTTON, TelegramApi, validateTelegramCommands } from './telegram-api.mjs';
 import { createTelegramHttpTransport } from './telegram-http.mjs';
 import { createTelegramBridgeStatus, TelegramHarnessBridge } from './telegram-bridge.mjs';
+import { VOICE_MAX_BYTES, telegramVoiceSource, voiceFailureReason, voiceNote } from './voice.mjs';
+import { evaluateInboundAccess } from '../shared/inbound-access.mjs';
+import { createConversationQueue } from '../shared/conversation-queue.mjs';
 import {
   splitTelegramRegularText,
   splitTelegramRichMarkdown,
@@ -275,9 +279,74 @@ export function normalizeTelegramCallback(update, { botId } = {}) {
   };
 }
 
+/**
+ * Access is decided before any download happens: a sender the allowlist refuses
+ * must not spend local CPU or a provider quota on a message that will be dropped.
+ */
+export function voiceMessageAllowed(accessPolicy, message) {
+  const decision = evaluateInboundAccess(accessPolicy, {
+    conversationType: message?.kind === 'direct' ? 'direct' : 'group',
+    senderIds: [message?.senderId],
+    text: '',
+  });
+  return decision.allowed === true;
+}
+
+function formatDurationMs(value) {
+  const ms = Math.max(1, Math.round(Number(value) || 0));
+  return ms < 1_000 ? `${ms}ms` : `${Math.round(ms / 1_000)}s`;
+}
+
+/**
+ * Fill `message.content` with a transcript or with an explicit note.
+ *
+ * `timeoutMs` bounds conversion plus provider time on its own controller, so a
+ * slow recognizer cannot hold the chat open for the runtime's lifetime.
+ */
+export async function fillVoiceContent({
+  message,
+  voice = message?.voice,
+  api,
+  transcriber,
+  timeoutMs = 60_000,
+  signal,
+  logFailure = null,
+} = {}) {
+  if (!transcriber) {
+    message.content = voiceNote({ voice, reason: 'speech recognition is not enabled in this Host' });
+    return;
+  }
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  const timer = setTimeout(() => controller.abort(), Math.max(1, timeoutMs));
+  signal?.addEventListener?.('abort', onAbort, { once: true });
+  try {
+    const audio = await api.downloadFile({
+      fileId: voice.fileId,
+      signal: controller.signal,
+      maxBytes: VOICE_MAX_BYTES,
+    });
+    const transcript = await transcriber.transcribe({ audio, voice, signal: controller.signal });
+    // Providers may return raw text; an empty result is not a transcript.
+    const text = typeof transcript === 'string' ? transcript.trim() : '';
+    message.content = text || voiceNote({ voice, reason: 'no speech recognized' });
+  } catch (error) {
+    if (signal?.aborted) return;
+    const reason = controller.signal.aborted
+      ? `transcription timed out after ${formatDurationMs(timeoutMs)}`
+      : voiceFailureReason(error);
+    message.content = voiceNote({ voice, reason });
+    logFailure?.(reason, error);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener?.('abort', onAbort);
+  }
+}
+
 export function normalizeTelegramUpdate(update, {
   botId,
   username,
+  groupTriggers,
   loadFile = async () => { throw new Error('Telegram file downloader is unavailable'); },
   loadFileStream = loadFile,
   loadReplyContent,
@@ -290,13 +359,21 @@ export function normalizeTelegramUpdate(update, {
     || !Number.isSafeInteger(messageId)) return null;
   if (!['private', 'group', 'supergroup'].includes(message.chat?.type)) return null;
   const direct = message.chat.type === 'private';
-  const addressed = direct
-    || String(message.reply_to_message?.from?.id ?? '') === String(botId)
+  // A reply to the bot or an @username mention is the legacy "tagged" signal;
+  // the per-group rule decides whether it is enough (or unnecessary).
+  const tagged = String(message.reply_to_message?.from?.id ?? '') === String(botId)
     || mentionedUsername(message, username);
+  const addressed = direct || groupTriggerAddressed(groupTriggers, {
+    chatId: String(chatId),
+    senderId: String(senderId),
+    tagged,
+  });
   const messageThreadId = Number.isSafeInteger(message.message_thread_id)
     ? message.message_thread_id : undefined;
   const image = telegramImageSource(message, loadFile);
   const file = telegramFileSource(message, loadFileStream);
+  // Voice notes carry no text; a speech service later fills `content` in.
+  const voice = telegramVoiceSource(message);
   const conversationId = messageThreadId === undefined
     ? String(chatId) : `${chatId}:${messageThreadId}`;
   const key = `${direct ? 'direct' : 'group'}:${conversationId}`;
@@ -330,6 +407,7 @@ export function normalizeTelegramUpdate(update, {
     plainText: typeof message.text === 'string',
     images: image ? [image] : [],
     files: file ? [file] : [],
+    ...(voice ? { voice } : {}),
     ...(replyTo ? { replyTo } : {}),
     addressed,
     reactionTarget: { chatId, messageId },
@@ -355,11 +433,6 @@ export function telegramInboundAllowed(message, {
 
 function telegramMessageId(value) {
   return Number.isSafeInteger(value?.message_id) ? String(value.message_id) : null;
-}
-
-function telegramMessageUnchanged(error) {
-  return error?.providerCode === 400
-    && /^(?:Bad Request: )?message is not modified(?::|$)/iu.test(error?.message ?? '');
 }
 
 function telegramFailure(error) {
@@ -397,6 +470,7 @@ class TelegramDeliveryStream {
   #lastUpdate = null;
   #lastBlock = null;
   #keepalive = false;
+  #previewAnswer = true;
   #previewStopped = false;
   #chain = Promise.resolve();
 
@@ -408,6 +482,7 @@ class TelegramDeliveryStream {
     presentation,
     logger,
     keepalive = false,
+    previewAnswer = true,
   }) {
     this.#update = update;
     this.#finish = finish;
@@ -419,6 +494,15 @@ class TelegramDeliveryStream {
     // keepalive refresh; editing a real placeholder message with identical
     // content would be rejected by the platform.
     this.#keepalive = keepalive === true;
+    // The placeholder is deleted before the answer is sent, so mirroring the
+    // answer text into it would show the same reply twice: first as a run of
+    // edits, then again as the delivered message.
+    this.#previewAnswer = previewAnswer !== false;
+  }
+
+  /** Whether answer text may be shown in the carrier before it is delivered. */
+  get previewAnswer() {
+    return this.#previewAnswer;
   }
 
   get providerMessageIds() {
@@ -679,63 +763,14 @@ export class TelegramBotClient {
     });
   }
 
-  async #sendPlain(target, text, { placeholderMessageId } = {}) {
+  async #sendPlain(target, text) {
     const chunks = splitTelegramRegularText(text);
-    const providerMessageIds = placeholderMessageId === undefined
-      ? []
-      : [String(placeholderMessageId)];
-    let firstUnsent = 0;
-    if (placeholderMessageId !== undefined) {
-      try {
-        await this.#api.editMessageText({
-          chatId: target.chatId,
-          messageId: placeholderMessageId,
-          text: chunks[0],
-          signal: this.#signal,
-        }).catch((error) => {
-          // The final answer may already be visible from the last progress edit.
-          if (!telegramMessageUnchanged(error)) throw error;
-        });
-        firstUnsent = 1;
-      } catch (error) {
-        const failure = telegramFailure(error);
-        if (failure.outcome === 'unknown') {
-          return deliveryResult('text-fallback', providerMessageIds, 'unknown', failure.reason);
-        }
-
-        const fallback = await this.#sendPlain(target, text);
-        const terminalText = fallback.deliveryOutcome === 'sent'
-          ? t('回复已发送。')
-          : fallback.deliveryOutcome === 'unknown'
-            ? t('回复发送结果未能确认。')
-            : t('消息发送失败，请稍后重试。');
-        try {
-          await this.#api.editMessageText({
-            chatId: target.chatId,
-            messageId: placeholderMessageId,
-            text: terminalText,
-            signal: this.#signal,
-          });
-        } catch (terminalError) {
-          this.#logger.warn?.(
-            '[dsh-im:telegram] unable to replace the processing placeholder:',
-            terminalError,
-          );
-        }
-        return deliveryResult(
-          'text-fallback',
-          [...providerMessageIds, ...fallback.providerMessageIds],
-          fallback.deliveryOutcome,
-          fallback.reason,
-        );
-      }
-    }
-
-    for (let index = firstUnsent; index < chunks.length; index += 1) {
+    const providerMessageIds = [];
+    for (const [index, chunk] of chunks.entries()) {
       try {
         const result = await this.#api.sendMessage({
           chatId: target.chatId,
-          text: chunks[index],
+          text: chunk,
           replyToMessageId: index === 0 ? target.replyToMessageId : undefined,
           messageThreadId: target.messageThreadId,
           signal: this.#signal,
@@ -753,6 +788,25 @@ export class TelegramBotClient {
       }
     }
     return deliveryResult('text-fallback', providerMessageIds);
+  }
+
+  /** Drop the progress placeholder before the answer is sent so the turn ends
+   *  with a notification instead of a silent edit. Best-effort: Telegram only
+   *  lets a bot delete its own messages for 48 hours, and a stale placeholder
+   *  must never cost the reader the answer that was already produced. */
+  async #deletePlaceholder(target, messageId) {
+    try {
+      await this.#api.deleteMessage({
+        chatId: target.chatId,
+        messageId,
+        signal: this.#signal,
+      });
+    } catch (error) {
+      this.#logger.warn?.(
+        '[dsh-im:telegram] unable to delete the processing placeholder:',
+        error,
+      );
+    }
   }
 
   async #sendRich(target, block) {
@@ -803,78 +857,6 @@ export class TelegramBotClient {
     return deliveryResult('telegram-rich-final', providerMessageIds);
   }
 
-  async #editRich(target, messageId, block) {
-    if (block.format === 'plain') {
-      return this.#sendPlain(target, block.text, {
-        placeholderMessageId: messageId,
-      });
-    }
-
-    let chunks;
-    try {
-      chunks = splitTelegramRichMarkdown(block.text);
-    } catch {
-      return this.#sendPlain(target, block.text, { placeholderMessageId: messageId });
-    }
-    const providerMessageIds = [String(messageId)];
-    try {
-      await this.#api.editMessageText({
-        chatId: target.chatId,
-        messageId,
-        richMessage: { markdown: chunks[0].markdown },
-        signal: this.#signal,
-      }).catch((error) => {
-        if (!telegramMessageUnchanged(error)) throw error;
-      });
-    } catch (error) {
-      const failure = telegramFailure(error);
-      if (failure.outcome === 'unknown') {
-        return deliveryResult(
-          'telegram-rich-final',
-          providerMessageIds,
-          'unknown',
-          failure.reason,
-        );
-      }
-      return this.#sendPlain(target, block.text, { placeholderMessageId: messageId });
-    }
-
-    for (const [offset, chunk] of chunks.slice(1).entries()) {
-      try {
-        const result = await this.#api.sendRichMessage({
-          chatId: target.chatId,
-          richMessage: { markdown: chunk.markdown },
-          messageThreadId: target.messageThreadId,
-          signal: this.#signal,
-        });
-        const id = telegramMessageId(result);
-        if (id) providerMessageIds.push(id);
-      } catch (error) {
-        const failure = telegramFailure(error);
-        if (failure.outcome === 'unknown') {
-          return deliveryResult(
-            'telegram-rich-final',
-            providerMessageIds,
-            'unknown',
-            failure.reason,
-          );
-        }
-        const remaining = chunks.slice(offset + 1).map((part) => part.source).join('');
-        const fallback = await this.#sendPlain({
-          ...target,
-          replyToMessageId: undefined,
-        }, remaining);
-        return deliveryResult(
-          fallback.presentation,
-          [...providerMessageIds, ...fallback.providerMessageIds],
-          fallback.deliveryOutcome,
-          fallback.reason,
-        );
-      }
-    }
-    return deliveryResult('telegram-rich-final', providerMessageIds);
-  }
-
   sendDelivery(target, value) {
     return this.#sendRich(target, createTextDeliveryBlock(value));
   }
@@ -912,12 +894,21 @@ export class TelegramBotClient {
         });
         return deliveryResult('telegram-rich-draft', [String(messageId)]);
       },
-      finish: (block) => this.#editRich(target, messageId, block),
-      fail: (block) => this.#sendPlain(target, block.text, {
-        placeholderMessageId: messageId,
-      }),
-      providerMessageIds: [String(messageId)],
+      // The placeholder carries progress only: its last frame would be a silent
+      // edit, so the answer goes out as its own message and Telegram notifies
+      // the reader that the turn is over.
+      finish: async (block) => {
+        await this.#deletePlaceholder(target, messageId);
+        return this.#sendRich(target, block);
+      },
+      fail: async (block) => {
+        await this.#deletePlaceholder(target, messageId);
+        return this.#sendPlain(target, block.text);
+      },
       presentation: 'telegram-regular',
+      // Answer text is not mirrored into the placeholder: it is deleted before
+      // the real message goes out, so a preview would duplicate the reply.
+      previewAnswer: false,
       logger: this.#logger,
     });
   }
@@ -1109,7 +1100,13 @@ export class TelegramRuntime {
   #state;
   #contextEnhancement;
   #groupHistory;
+  #groupTriggers;
   #accessPolicy;
+  #voice;
+  #voiceTimeoutMs;
+  #conversationQueue;
+  /** Reasons already reported, so a broken recognizer logs once. */
+  #voiceFailures = new Set();
   #logger;
   #diagnostics;
   #replyTimeoutMs;
@@ -1140,6 +1137,8 @@ export class TelegramRuntime {
     contextEnhancement,
     groupHistory,
     accessPolicy,
+    voice = null,
+    voiceTimeoutMs = 60_000,
     logger = console,
     replyTimeoutMs = 600_000,
     createApi = (options) => new TelegramApi(options),
@@ -1155,7 +1154,20 @@ export class TelegramRuntime {
     this.#state = state;
     this.#contextEnhancement = contextEnhancement;
     this.#groupHistory = groupHistory;
+    // Rules change through the controller, which restarts the runtime, so the
+    // normalized snapshot is read once per start.
+    this.#groupTriggers = normalizeGroupTriggers(config.groupTriggers);
     this.#accessPolicy = accessPolicy;
+    // null when the Host mounts no speech service; voice messages then stay textless.
+    this.#voice = voice;
+    this.#voiceTimeoutMs = voiceTimeoutMs;
+    // Voice prep and delivery are serialised per conversation, never per poll.
+    this.#conversationQueue = createConversationQueue({
+      onError: (error, key) => this.#logger.error?.(
+        `[dsh-im:telegram] bot ${this.#config.botId} queued work failed for ${key}:`,
+        error?.message ?? error,
+      ),
+    });
     this.#logger = logger; this.#diagnostics = createConnectionDiagnostics({ channel: 'telegram', logger });
     this.#replyTimeoutMs = replyTimeoutMs;
     this.#createApi = createApi;
@@ -1303,6 +1315,7 @@ export class TelegramRuntime {
           );
         }
       }
+      await this.#replayPendingVoice(controller.signal);
       this.#pollTask = this.#poll(cursor, controller.signal);
       this.#pollTask.catch((error) => {
         if (controller.signal.aborted) return;
@@ -1368,6 +1381,132 @@ export class TelegramRuntime {
     }
   }
 
+  /**
+   * Queue one update: durable pending record first, then per-conversation work.
+   *
+   * Ordering inside a chat is kept, while other chats, callbacks and the cursor
+   * keep moving. The pending entry is removed only once the bridge owns the
+   * message, so a restart before that point can replay it.
+   */
+  async #dispatchUpdate(update, message, contextSnapshot, signal) {
+    const needsPreparation = Boolean(message.voice) && message.addressed === true
+      && !message.content.trim();
+    const pendingId = `telegram-voice:${update.update_id}`;
+    if (needsPreparation) {
+      try {
+        await this.#state.putPendingMessage({
+          id: pendingId,
+          key: message.conversationId,
+          messageId: String(message.messageId),
+          kind: message.kind,
+          text: voiceNote({ voice: message.voice, reason: 'transcription pending' }),
+          senderId: String(message.senderId),
+          target: { voiceReplay: { update, contextSnapshot } },
+        });
+      } catch (error) {
+        this.#logger.warn?.(
+          `[dsh-im:telegram] bot ${this.#config.botId} could not persist a queued voice message:`,
+          error?.message ?? error,
+        );
+      }
+    }
+    let accepted = false;
+    void this.#conversationQueue.run(message.conversationId, async () => {
+      try {
+        if (signal.aborted) return;
+        if (needsPreparation) await this.#transcribeVoice(message, signal);
+        if (signal.aborted) return;
+        await captureGroupHistory(this.#groupHistory, message, groupHistoryEntry('telegram', update, message), {
+          logger: this.#logger,
+        });
+        accepted = true;
+        // The bridge owns turn ordering; awaiting it here would park the
+        // conversation behind a turn that waits for the user.
+        void this.#bridge.accept(message, { contextSnapshot }).catch((error) => {
+          if (signal.aborted) return;
+          this.#logger.error?.(
+            `[dsh-im:telegram] bot ${this.#config.botId} message handling failed:`,
+            extractConnectionEvidence(error).details,
+          );
+        });
+      } finally {
+        // A cancelled prepare keeps the record: the next start replays it.
+        if (needsPreparation && accepted) {
+          await this.#state.removePendingMessage(pendingId).catch(() => {});
+        }
+      }
+    });
+  }
+
+  /**
+   * Replay voice messages whose preparation was interrupted by a restart.
+   *
+   * The raw update travels with the pending record, so the message is rebuilt
+   * exactly as the poller first saw it.
+   */
+  async #replayPendingVoice(signal) {
+    let entries = [];
+    try {
+      entries = typeof this.#state.pendingMessages === 'function' ? this.#state.pendingMessages() : [];
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const replayed = entry?.target?.voiceReplay;
+      if (!replayed || !replayed.update) continue;
+      if (signal.aborted) return;
+      const message = normalizeTelegramUpdate(replayed.update, {
+        botId: this.#config.platformId,
+        username: this.#config.username,
+        // Same rules the poller applied: a replayed group update must keep the
+        // addressing decision that queued it.
+        groupTriggers: this.#groupTriggers,
+        loadFile: (fileId, options) => this.#api.downloadFile({ fileId, ...options }),
+        loadFileStream: (fileId, options) => this.#api.downloadFileStream({ fileId, ...options }),
+        loadReplyContent: (reference, options) => this.#loadReplyContent(reference, options),
+      });
+      if (!message) {
+        await this.#state.removePendingMessage(entry.id).catch(() => {});
+        continue;
+      }
+      this.#logger.warn?.(
+        `[dsh-im:telegram] bot ${this.#config.botId} replaying an interrupted voice message`,
+      );
+      await this.#dispatchUpdate(replayed.update, message, replayed.contextSnapshot, signal);
+    }
+  }
+
+  /**
+   * Substitute a transcript — or an explicit "not transcribed" note — for an
+   * empty voice message.
+   *
+   * The note is the model's input, not the user's answer: the channel never
+   * phrases a reply on its own, and the note says plainly that no transcript
+   * exists so nothing is invented from the audio.
+   */
+  async #transcribeVoice(message, signal) {
+    if (!voiceMessageAllowed(this.#accessPolicy, message)) return;
+    await fillVoiceContent({
+      message,
+      voice: message.voice,
+      api: this.#api,
+      transcriber: this.#voice,
+      timeoutMs: this.#voiceTimeoutMs,
+      signal,
+      logFailure: (reason, error) => this.#logVoiceFailure(reason, error),
+    });
+  }
+
+  /** Report one reason per runtime start; the model still gets a note every time. */
+  #logVoiceFailure(reason, error) {
+    if (this.#voiceFailures.has(reason)) return;
+    this.#voiceFailures.add(reason);
+    this.#logger.warn?.(
+      `[dsh-im:telegram] bot ${this.#config.botId} voice transcription unavailable: ${reason}`,
+      error?.message ?? '',
+    );
+  }
+
   async #loadReplyContent(reference, { signal } = {}) {
     const key = typeof reference?.conversationKey === 'string'
       ? reference.conversationKey.trim() : '';
@@ -1423,21 +1562,15 @@ export class TelegramRuntime {
         const message = normalizeTelegramUpdate(update, {
           botId: this.#config.platformId,
           username: this.#config.username,
+          groupTriggers: this.#groupTriggers,
           loadFile: (fileId, options) => this.#api.downloadFile({ fileId, ...options }),
           loadFileStream: (fileId, options) => this.#api.downloadFileStream({ fileId, ...options }),
           loadReplyContent: (reference, options) => this.#loadReplyContent(reference, options),
         });
         if (message) {
-          await captureGroupHistory(this.#groupHistory, message, groupHistoryEntry('telegram', update, message), {
-            logger: this.#logger,
-          });
-          void this.#bridge.accept(message, { contextSnapshot }).catch((error) => {
-            if (signal.aborted) return;
-            this.#logger.error?.(
-              `[dsh-im:telegram] bot ${this.#config.botId} message handling failed:`,
-              extractConnectionEvidence(error).details,
-            );
-          });
+          // The queued record is written before the caller persists the cursor,
+          // so a restart replays preparation instead of losing the update.
+          await this.#dispatchUpdate(update, message, contextSnapshot, signal);
         }
         cursor = update.update_id + 1;
         await this.#state.setCursor(cursor);
@@ -1447,6 +1580,7 @@ export class TelegramRuntime {
 
   async stop() {
     const pollTask = this.#pollTask;
+    const queued = this.#conversationQueue.idle();
     const bridge = this.#bridge;
     const httpTransport = this.#httpTransport;
     this.#abortController?.abort();
@@ -1457,6 +1591,11 @@ export class TelegramRuntime {
     this.#bridge = null;
     await Promise.race([
       pollTask?.catch(() => undefined) ?? Promise.resolve(),
+      new Promise((resolve) => setTimeout(resolve, 2_000)),
+    ]);
+    // Queued per-conversation work settles on its own deadline, never shutdown.
+    await Promise.race([
+      queued,
       new Promise((resolve) => setTimeout(resolve, 2_000)),
     ]);
     await Promise.race([
