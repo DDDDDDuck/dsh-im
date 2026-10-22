@@ -1,6 +1,6 @@
 import { connectionHint, extractConnectionEvidence, messageDiagnosticError, runtimeDiagnosticDetails } from './connection-error.mjs';
+import { createFailureReferenceId } from './delivery-failure-log.mjs';
 import { diagnosticFields } from './diagnostic-details.mjs';
-import { randomUUID } from 'node:crypto';
 
 import { t } from './i18n.mjs';
 
@@ -197,7 +197,7 @@ function transportFailureCode(error, details) {
 function safeReferenceId(value) {
   return typeof value === 'string' && /^[A-Z0-9-]{6,40}$/u.test(value)
     ? value
-    : `MF-${randomUUID().slice(0, 8).toUpperCase()}`;
+    : createFailureReferenceId();
 }
 
 function safeFailureReason(value) {
