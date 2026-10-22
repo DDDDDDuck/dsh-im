@@ -283,8 +283,8 @@ DSH versions supporting global panels show **IM bots** in the left sidebar, usin
 | `/repair` | In a Feishu direct chat, incrementally repair the card callback and permissions required for media, group bot mentions, and the native Slash Command panel. |
 | `/compact` | Immediately compact older context in the Session bound to the current chat. |
 | `/clear` | Clear the model context in the Session bound to the current chat while retaining its Session binding and history; report explicitly when the current Host does not support the command. |
-| `/workspace <workspace index or absolute path>`, `/ws <workspace index or absolute path>` | Switch the current bot's Harness workspace by `/workspacelist` index or absolute path. |
-| `/workspacelist`, `/workspaces`, `/wsl` | List workspace absolute paths that still exist on the current Harness Host. |
+| `/workspace [workspace index or absolute path]`, `/ws [...]` | View and switch the current bot's Harness workspace: without an argument it lists switchable workspaces (a tappable card on Telegram — one tap switches and the current entry is re-marked in place); an index or absolute path switches directly. |
+| `/workspacelist`, `/workspaces`, `/wsl` | Legacy aliases of `/workspace`, equivalent to its no-argument form; native command menus keep a single workspace entry. |
 | `/sessionlist [workspace number or absolute path]`, `/sessions [...]` | Equivalent aliases that list session IDs and titles in the selected workspace, including ungrouped sessions in the default IM directory; omit the argument to use the current workspace. |
 | `/sessionlist --limit N`, `/sessions --limit N` | List the first N sessions in the current workspace's existing order; N must be a positive integer. |
 | `/session <Session ID>` | Bind the current chat to an existing Harness session. |

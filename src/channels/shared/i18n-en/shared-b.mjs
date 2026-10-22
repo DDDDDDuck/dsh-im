@@ -83,6 +83,11 @@ export default {
   '否': 'No',
   '用法：/workspace 工作区序号或绝对路径':
     'Usage: /workspace Workspace index or absolute path',
+  '查看或切换工作区': 'View or switch Workspace',
+  '/workspace 或 /ws  查看可切换的工作区（点按钮切换）':
+    '/workspace or /ws  View switchable Workspaces (tap a button to switch)',
+  '/workspacelist、/wsl、/workspaces  工作区列表别名（等同 /ws）':
+    '/workspacelist, /wsl, /workspaces  Workspace-list aliases (same as /ws)',
   '当前机器人暂不支持切换工作区。': 'This bot does not support switching Workspaces yet.',
   '工作区已切换为：{workspace}': 'Workspace switched to: {workspace}',
   '{message}\n用法：/workspace 工作区序号或绝对路径':
