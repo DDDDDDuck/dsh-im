@@ -11,6 +11,7 @@ import {
   normalizeThinkingNumbering,
   SET_THINKING_CADENCE_ENDPOINT,
 } from '../../../../src/channels/shared/thinking-cadence.mjs';
+import { normalizeSendLimitPerMinute, SET_SEND_LIMIT_ENDPOINT } from '../../../../src/channels/shared/send-limit.mjs';
 
 const ACCOUNT_STATES = new Set(['connected', 'connecting', 'offline', 'error']);
 
@@ -47,6 +48,7 @@ export const TOKEN_BOT_ENDPOINTS = Object.freeze({
   setAlias: 'bot.alias.set',
   setThinkingTraces: 'bot.thinking-traces.set',
   setThinkingCadence: SET_THINKING_CADENCE_ENDPOINT,
+  setSendLimit: SET_SEND_LIMIT_ENDPOINT,
 });
 
 export function createTokenChannelApi(channel, connectionSummary, {
@@ -83,6 +85,8 @@ export function createTokenChannelApi(channel, connectionSummary, {
       // Absent or unusable falls back to the same defaults the backend applies.
       thinkingNumbering: normalizeThinkingNumbering(value.thinkingNumbering),
       thinkingIntervalSeconds: normalizeThinkingIntervalSeconds(value.thinkingIntervalSeconds),
+      // Absent or unusable falls back to the same default the backend applies.
+      sendLimitPerMinute: normalizeSendLimitPerMinute(value.sendLimitPerMinute),
       ...(Object.hasOwn(value, 'accessPolicy')
         ? { accessPolicy: normalizeAccessPolicy(value.accessPolicy) }
         : {}),

@@ -1,12 +1,13 @@
 /**
- * 会话行为设置块：思考过程留痕、帧编号与帧节奏（Telegram 专属）。
+ * 会话行为设置块：思考过程留痕、帧编号、帧节奏与消息发送上限（Telegram 专属）。
  *
  * 开启留痕后，机器人把 agent 的推理与工具调用作为独立的 💭/🔧 消息实时发出来，
- * 最终答案单独成条；关闭则回到「占位符被最终答案覆盖」的原有单消息行为。
+ * 最终答案单独成条；关闭留痕后使用常规占位符进度，完成时删除占位符并发送答案。
  * 一轮里可能产生几十帧，所以另外两个设置决定这串消息的样子：编号让顺序可见，
  * 节奏把突发合并成最新一帧，而不是排一队过期的消息。
  */
 import { normalizeThinkingIntervalSeconds } from '../../../../src/channels/shared/thinking-cadence.mjs';
+import { DEFAULT_SEND_LIMIT_PER_MINUTE } from '../../../../src/channels/shared/send-limit.mjs';
 import { h } from '../../i18n.js';
 import * as React from 'react';
 
@@ -19,6 +20,44 @@ export const THINKING_INTERVAL_OPTIONS = Object.freeze([
 function intervalValues(saved) {
   if (THINKING_INTERVAL_OPTIONS.includes(saved)) return THINKING_INTERVAL_OPTIONS;
   return [...THINKING_INTERVAL_OPTIONS, saved].sort((left, right) => left - right);
+}
+
+function SendLimitField({ account, busy, saving, onCommit }) {
+  const saved = Number.isInteger(account.sendLimitPerMinute)
+    ? account.sendLimitPerMinute
+    : DEFAULT_SEND_LIMIT_PER_MINUTE;
+  const [value, setValue] = React.useState(String(saved));
+  // A save from another tab, or a reconnect, rewrites the stored value.
+  React.useEffect(() => { setValue(String(saved)); }, [saved]);
+  const commit = () => {
+    const numeric = Number(value.trim());
+    if (!value.trim() || !Number.isFinite(numeric) || Math.round(numeric) === saved) {
+      setValue(String(saved));
+      return;
+    }
+    onCommit?.(Math.round(numeric));
+  };
+  return h('label', { className: 'dim-accountSettingsRow' },
+    h('span', { className: 'dim-accountSettingsText' },
+      h('span', { className: 'dim-accountSettingsLabel' }, '消息发送上限'),
+      h('span', { className: 'dim-accountSettingsHelp' },
+        '每个聊天每分钟的消息数；机器人会等待而不是丢弃')),
+    h('input', {
+      type: 'number',
+      min: 1,
+      max: 30,
+      step: 1,
+      className: 'dim-accountSettingsNumber',
+      value,
+      disabled: Boolean(busy) || saving,
+      onChange: (event) => { setValue(event.target.value); },
+      onBlur: commit,
+      onKeyDown: (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        commit();
+      },
+    }));
 }
 
 export function ThinkingTracesSettings({
@@ -50,6 +89,20 @@ export function ThinkingTracesSettings({
     } catch {
       // 服务端存的值仍然作准：界面回到它，免得显示一个没保存的节奏。
       setDraft({ thinkingNumbering: storedNumbering, thinkingIntervalSeconds: storedInterval });
+    } finally {
+      setSaving(false);
+    }
+  };
+  const sendLimitEndpoint = endpoints?.setSendLimit;
+  const commitSendLimit = async (sendLimitPerMinute) => {
+    if (typeof rpcCall !== 'function' || !sendLimitEndpoint) return;
+    setSaving(true);
+    try {
+      const response = await rpcCall(sendLimitEndpoint, { botId: account.botId, sendLimitPerMinute });
+      if (response && response.ok === false) throw new Error(response.error?.message ?? '请求失败');
+      await onChanged?.({ silent: true });
+    } catch {
+      // The stored value stays authoritative; the next reload shows it again.
     } finally {
       setSaving(false);
     }
@@ -95,5 +148,11 @@ export function ThinkingTracesSettings({
       }, intervalValues(draft.thinkingIntervalSeconds).map((value) => h('option', {
         key: value,
         value: String(value),
-      }, value === 0 ? '不限制（0）' : String(value))))));
+      }, value === 0 ? '不限制（0）' : String(value))))),
+    h(SendLimitField, {
+      account,
+      busy: Boolean(busy),
+      saving,
+      onCommit: commitSendLimit,
+    }));
 }

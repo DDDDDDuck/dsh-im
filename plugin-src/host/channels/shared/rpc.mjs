@@ -18,6 +18,7 @@ import {
 import { SET_MODEL_ENDPOINT, validModelPayload } from './model-setting-rpc.mjs';
 import { SET_THINKING_TRACES_ENDPOINT, validThinkingTracesPayload } from './thinking-traces-rpc.mjs';
 import { SET_THINKING_CADENCE_ENDPOINT, validThinkingCadencePayload } from './thinking-cadence-rpc.mjs';
+import { SET_SEND_LIMIT_ENDPOINT, validSendLimitPayload } from './send-limit-rpc.mjs';
 
 export const TOKEN_BOT_ENDPOINTS = Object.freeze({
   status: 'connection.status',
@@ -33,6 +34,7 @@ export const TOKEN_BOT_ENDPOINTS = Object.freeze({
   setAlias: SET_ALIAS_ENDPOINT,
   setThinkingTraces: SET_THINKING_TRACES_ENDPOINT,
   setThinkingCadence: SET_THINKING_CADENCE_ENDPOINT,
+  setSendLimit: SET_SEND_LIMIT_ENDPOINT,
 });
 
 const ENDPOINTS = Object.freeze(Object.values(TOKEN_BOT_ENDPOINTS));
@@ -114,6 +116,10 @@ function payloadFailure(endpoint, payload) {
   if (endpoint === TOKEN_BOT_ENDPOINTS.setThinkingCadence) {
     return validThinkingCadencePayload(payload)
       ? null : '请提交有效的思考帧节奏设置。';
+  }
+  if (endpoint === TOKEN_BOT_ENDPOINTS.setSendLimit) {
+    return validSendLimitPayload(payload)
+      ? null : '请提交有效的消息发送上限。';
   }
   return 'Unknown bot endpoint.';
 }
@@ -224,6 +230,9 @@ export function createTokenBotRpcHandler(controller, { channel }) {
           thinkingNumbering: payload.thinkingNumbering,
           thinkingIntervalSeconds: payload.thinkingIntervalSeconds,
         });
+      } else if (endpoint === TOKEN_BOT_ENDPOINTS.setSendLimit) {
+        if (typeof controller.setSendLimitPerMinute !== 'function') throw new Error('Send limit update is unavailable');
+        value = await controller.setSendLimitPerMinute(payload.botId, payload.sendLimitPerMinute);
       } else {
         value = await controller.deleteBot(payload.botId);
       }

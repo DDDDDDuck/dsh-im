@@ -2,6 +2,7 @@ import { TokenBotController } from '../shared/token-bot-controller.mjs';
 import {
   deriveTelegramBotIdentity,
   maskTelegramBotId,
+  normalizeSendLimitPerMinute,
   normalizeTelegramAccessPolicy,
 } from './config-store.mjs';
 import {
@@ -62,6 +63,7 @@ export class TelegramController extends TokenBotController {
           // 0 means no pacing, which is also what an absent field means.
           thinkingIntervalSeconds: normalizeThinkingIntervalSeconds(config?.thinkingIntervalSeconds),
           groupTriggers: normalizeGroupTriggers(config?.groupTriggers),
+          sendLimitPerMinute: normalizeSendLimitPerMinute(config?.sendLimitPerMinute),
         };
       }),
     };
@@ -91,6 +93,12 @@ export class TelegramController extends TokenBotController {
       thinkingNumbering: numbering,
       thinkingIntervalSeconds: interval,
     }));
+  }
+
+  /** Persist the per-chat send limit; the runtime restarts with the new value. */
+  async setSendLimitPerMinute(botId, value) {
+    const sendLimitPerMinute = normalizeSendLimitPerMinute(value);
+    return this.updateBotConfig(botId, (config) => ({ ...config, sendLimitPerMinute }));
   }
 
   /** Channels the bot has actually received messages from. */

@@ -17,6 +17,15 @@ export {
   SET_THINKING_CADENCE_ENDPOINT,
   THINKING_INTERVAL_MAX_SECONDS,
 } from '../shared/thinking-cadence.mjs';
+import { normalizeSendLimitPerMinute } from '../shared/send-limit.mjs';
+
+export {
+  DEFAULT_SEND_LIMIT_PER_MINUTE,
+  normalizeSendLimitPerMinute,
+  SEND_LIMIT_MAX_PER_MINUTE,
+  SEND_LIMIT_MIN_PER_MINUTE,
+  SET_SEND_LIMIT_ENDPOINT,
+} from '../shared/send-limit.mjs';
 
 const IDENTITY_OPTIONS = Object.freeze({
   botPrefix: 'telegram',
@@ -67,8 +76,9 @@ function normalizeTelegramBotExtension(value) {
   const hasGroupTriggers = Object.hasOwn(value, 'groupTriggers');
   const hasThinkingNumbering = Object.hasOwn(value, 'thinkingNumbering');
   const hasThinkingInterval = Object.hasOwn(value, 'thinkingIntervalSeconds');
+  const hasSendLimit = Object.hasOwn(value, 'sendLimitPerMinute');
   if (!hasAccessMode && !hasAllowedUsers && !hasThinkingTraces && !hasGroupTriggers
-    && !hasThinkingNumbering && !hasThinkingInterval) return {};
+    && !hasThinkingNumbering && !hasThinkingInterval && !hasSendLimit) return {};
   try {
     const policy = normalizeTelegramAccessPolicy(value);
     return {
@@ -84,6 +94,8 @@ function normalizeTelegramBotExtension(value) {
       ...(hasThinkingInterval
         ? { thinkingIntervalSeconds: normalizeThinkingIntervalSeconds(value.thinkingIntervalSeconds) }
         : {}),
+      // Stored clamped so a bad value never reaches the runtime.
+      ...(hasSendLimit ? { sendLimitPerMinute: normalizeSendLimitPerMinute(value.sendLimitPerMinute) } : {}),
     };
   } catch {
     return null;
