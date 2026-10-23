@@ -13524,3 +13524,46 @@ for (const scenario of ['final rewrite', 'shrink and regrow', 'unchanged draft']
     assert.deepEqual(fx.text, []);
   });
 }
+
+for (const mode of ['text', 'stream', 'fallback']) {
+  test(`corrupt Session recovery sends a Feishu notice before the answer (${mode})`, async () => {
+    const fixture = stateFixture([['p2p:ou_user', 'corrupt-session']]);
+    const sent = [];
+    let created = 0;
+    const status = bridgeStatus();
+    const bridge = new FeishuHarnessBridge({
+      client: textClient(message => sent.push(message.text)),
+      ...(mode === 'text' ? {} : { channel: { stream: async (_chatId, input) => {
+        if (mode === 'fallback') throw new Error('stream unavailable');
+        await input.markdown({ setContent: async text => sent.push(text) });
+        return { messageId: 'om_stream' };
+      } } }),
+      state: fixture.state, status,
+      allowedSenderOpenIds: new Set(['ou_user']),
+      harness: {
+        ensureRunning: async () => {},
+        sessionExists: async id => {
+          if (id === 'corrupt-session') throw Object.assign(new Error('unreadable'), { code: 'session-unreadable' });
+          return true;
+        },
+        createSession: async () => { created++; return 'replacement-session'; },
+        ask: async (id, text) => {
+          assert.equal(id, 'replacement-session');
+          assert.equal(text, 'recovery test');
+          assert.equal(sent.length, 1);
+          assert.match(sent[0], /日志已损坏.*新会话/u);
+          return 'RECOVERY_OK';
+        },
+      },
+      logger: { warn() {} },
+    });
+    bridge.accept(event(`om_corrupt_${mode}`, 'recovery test'));
+    await bridge.waitForIdle();
+    assert.equal(created, 1);
+    assert.equal(fixture.sessions.get('p2p:ou_user'), 'replacement-session');
+    assert.equal(sent.length, 2);
+    assert.equal(sent[1], 'RECOVERY_OK');
+    assert.equal(status.messagesReplied, 1);
+    assert.equal(status.lastError, null);
+  });
+}

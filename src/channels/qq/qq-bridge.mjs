@@ -1272,6 +1272,7 @@ export class QqHarnessBridge {
         // already own.
         await this.#markPendingSubmitted(key, messageId);
         ({ answer, artifacts = [] } = await askInWorkspaceSession({
+          onNotice: (notice) => this.#bot.sendText(target, notice),
           deferredDelivery: () => ({ coordinator: this.#deferred, target: { scope: target.scope, targetId: target.targetId } }),
           harness: this.#harness,
           state: this.#state,
