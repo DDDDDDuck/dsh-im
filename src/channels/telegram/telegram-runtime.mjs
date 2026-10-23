@@ -1225,14 +1225,18 @@ export class TelegramBotClient {
           if (result?.deliveryOutcome === 'unknown') {
             // 结果未知（超时等）：可能已送达，重发会造成重复，保留 unknown 状态。
             remember(result.providerMessageIds);
-            return deliveryResult('telegram-thinking', providerMessageIds, 'unknown', result.reason);
+            return deliveryResult(
+              'telegram-thinking', providerMessageIds, 'unknown', result.reason, result.deliveryEvidence,
+            );
           }
           // 明确失败：该分片确认未送达。纯文本分片再走一次 plain 重发
           // （markdown 分片的 plain 回退已在 #sendRich 内尝试过），只重发
           // 尚未发送的尾部内容，已成功的分片不重复。
           remember(result?.providerMessageIds);
           if (format === 'markdown') {
-            return deliveryResult('telegram-thinking', providerMessageIds, 'failed', result.reason);
+            return deliveryResult(
+              'telegram-thinking', providerMessageIds, 'failed', result.reason, result.deliveryEvidence,
+            );
           }
           warnFailure('final answer chunk', new Error('chunk definitively rejected'));
           try {
