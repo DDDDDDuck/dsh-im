@@ -12,6 +12,7 @@ import {
   SET_THINKING_CADENCE_ENDPOINT,
 } from '../../../../src/channels/shared/thinking-cadence.mjs';
 import { normalizeSendLimitPerMinute, SET_SEND_LIMIT_ENDPOINT } from '../../../../src/channels/shared/send-limit.mjs';
+import { channelName, localizeTemplate, localizeText } from '../../i18n.js';
 
 const ACCOUNT_STATES = new Set(['connected', 'connecting', 'offline', 'error']);
 
@@ -56,10 +57,10 @@ export function createTokenChannelApi(channel, connectionSummary, {
 } = {}) {
   const unwrapRpcResult = (result) => {
     if (!isRecord(result) || typeof result.ok !== 'boolean') {
-      throw new Error(`${channel} 服务返回了无法识别的响应`);
+      throw new Error(localizeTemplate('{channel} 服务返回了无法识别的响应', { channel: channelName(channel) }));
     }
     if (!result.ok) {
-      const error = new Error(text(result.error?.message, `${channel} 操作失败`));
+      const error = new Error(text(result.error?.message, localizeTemplate('{channel} 操作失败', { channel: channelName(channel) })));
       error.code = text(result.error?.code, `${channel.toUpperCase()}_RPC_ERROR`, 80);
       Object.assign(error, diagnosticFields(result.error));
     throw error;
@@ -92,14 +93,18 @@ export function createTokenChannelApi(channel, connectionSummary, {
         : {}),
       bot: {
       ...normalizeBotAlias(value.bot),
-        name: text(value.bot?.name, `${channel}机器人`, 100),
+        name: text(value.bot?.name, localizeTemplate('{channel}机器人', { channel: channelName(channel) }), 100),
         username: text(value.bot?.username, '', 100),
         idMasked: text(value.bot?.idMasked, '机器人标识已安全保存', 140),
       },
       health: {
         summary: text(
           value.health?.summary,
-          connected ? `${channel}${connectionSummary}运行正常` : `${channel}连接尚未就绪`,
+          connected
+            ? localizeTemplate('{subject}运行正常', {
+              subject: `${channelName(channel)}${localizeText(connectionSummary)}`,
+            })
+            : localizeTemplate('{channel}连接尚未就绪', { channel: channelName(channel) }),
         ),
         lastCheckedAt: timestamp(value.health?.lastCheckedAt),
       },
@@ -107,7 +112,7 @@ export function createTokenChannelApi(channel, connectionSummary, {
       error: isRecord(value.error) ? {
         ...diagnosticFields(value.error),
         code: text(value.error.code, `${channel.toUpperCase()}_ACCOUNT_ERROR`, 80),
-        message: text(value.error.message, `${channel}连接尚未就绪`),
+        message: text(value.error.message, localizeTemplate('{channel}连接尚未就绪', { channel: channelName(channel) })),
       } : null,
       ...(isRecord(extension) ? extension : {}),
     };
@@ -116,7 +121,7 @@ export function createTokenChannelApi(channel, connectionSummary, {
   const normalizeSnapshot = (value) => {
     const source = isRecord(value?.snapshot) ? value.snapshot : value;
     if (!isRecord(source) || !Array.isArray(source.bots)) {
-      throw new Error(`${channel} 服务没有返回有效的机器人列表`);
+      throw new Error(localizeTemplate('{channel} 服务没有返回有效的机器人列表', { channel: channelName(channel) }));
     }
     const bots = source.bots.map(normalizeBot).filter(Boolean);
     return {
@@ -132,7 +137,7 @@ export function createTokenChannelApi(channel, connectionSummary, {
   const presentError = (error) => ({
     ...diagnosticFields(error),
     code: text(error?.code, `${channel.toUpperCase()}_ERROR`, 80),
-    message: text(error?.message, `${channel}操作失败，请稍后重试`),
+    message: text(error?.message, localizeTemplate('{channel}操作失败，请稍后重试', { channel: channelName(channel) })),
   });
 
   return Object.freeze({ unwrapRpcResult, normalizeSnapshot, presentError });
