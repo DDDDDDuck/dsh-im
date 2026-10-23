@@ -2018,7 +2018,12 @@ export class FeishuHarnessBridge {
       }
       throw error;
     } finally {
-      await this.#cancelPendingInteraction(key);
+      // Synced questions (including DS Bot's ask_user) outlive the turn that
+      // presented them. Only turn-owned questions belong to this cleanup;
+      // their failed-delivery/error paths must still resolve by cancellation.
+      if (this.#pendingInteractions.get(key)?.lifecycle !== 'session-sync') {
+        await this.#cancelPendingInteraction(key);
+      }
       await this.#approvals.closeRoute(key);
       this.#voiceTurns.delete(key);
     }
@@ -6328,7 +6333,9 @@ export class FeishuHarnessBridge {
     Promise.resolve(completion).then(finish, finish);
     try {
       await validate();
-      await this.#handleInteraction(interaction, { ...context, validate, onClear: cleanup });
+      await this.#handleInteraction(interaction, {
+        ...context, validate, onClear: cleanup, lifecycle: 'session-sync',
+      });
       if (finished) finish(); // A completion during delivery must not leave a pending behind.
       const available = !finished && this.#pendingInteractions.get(context.key)?.interactionId === interaction.interactionId;
       if (!available) cleanup();
@@ -6348,6 +6355,7 @@ export class FeishuHarnessBridge {
     receiveIdType,
     validate,
     onClear,
+    lifecycle = 'turn',
   }) {
     if (await this.#approvals.handleRequested(interaction, this.#approvalContext({
       key, actor, chatId, requiresMention, replyToMessageId,
@@ -6425,6 +6433,7 @@ export class FeishuHarnessBridge {
       receiveIdType,
       validate,
       onClear,
+      lifecycle,
       queue: null,
       claimedReplyMessageId: null,
       submitting: false,
@@ -6574,6 +6583,13 @@ export class FeishuHarnessBridge {
     if (!pending || pending.kind !== 'question') return;
     this.#rememberResolvedInteraction(key, pending);
     try {
+      // A synced question is owned by its upstream provider, not this IM turn.
+      // Withdraw the IM route so the provider also releases its delivery state;
+      // DS Bot's answer endpoint does not accept a Harness cancellation answer.
+      if (pending.lifecycle === 'session-sync' && pending.interaction.withdraw) {
+        await pending.interaction.withdraw();
+        return;
+      }
       await pending.interaction.respond({
         ok: false,
         error: {

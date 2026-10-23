@@ -6,6 +6,11 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- 修复飞书私聊发起 DS Bot 提问后，回合收尾误取消新问题卡、点击提示“已在其他客户端处理”的问题；同步问题按自身生命周期结束，撤回时同步释放投递状态，保留普通 Harness 问答及发送失败时的取消清理。（[#447](https://github.com/xmanrui/dsh-im/issues/447)）
+  Fixed Feishu-initiated DS Bot questions being cancelled by turn cleanup immediately after delivery. Synced questions now retain their own lifetime and release upstream delivery state on withdrawal, while ordinary Harness questions and failed-delivery cancellation retain their existing cleanup. ([#447](https://github.com/xmanrui/dsh-im/issues/447))
+
 ## [5.5.0] - 2026-10-24
 
 ### Added / 新增

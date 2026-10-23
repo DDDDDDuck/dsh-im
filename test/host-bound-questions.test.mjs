@@ -9,6 +9,7 @@ import { DeliveryService } from '../plugin-src/host/delivery-service.mjs';
 import { BotWorkspaceStore } from '../src/channels/shared/bot-workspace-store.mjs';
 import { ConversationStateStore } from '../src/channels/shared/conversation-state-store.mjs';
 import { FeishuRuntime } from '../src/channels/feishu/feishu-runtime.mjs';
+import { FeishuHarnessBridge } from '../src/channels/feishu/bridge.mjs';
 import { MultiBotDshFeishuController } from '../src/channels/feishu/multi-bot-controller.mjs';
 import { directAccessPolicy } from './channels/access-policy-fixture.mjs';
 import { installDsBotQuestionSync } from '../plugin-src/host/ds-bot-question-sync.mjs';
@@ -31,7 +32,8 @@ const answer = { answers: [{ id: 'choice', selected: ['Yes'] }] };
 
 // Real Host adapter, binding store, delivery service, controller and Feishu runtime.
 // Only the native question UI, Harness backend and Feishu SDK transport are faked.
-async function fixture(t, { failCards = false, failText = false, sendGate } = {}) {
+async function fixture(t, { failCards = false, failText = false, sendGate, cardGate } = {}) {
+  t.after(() => { sendGate?.resolve(); cardGate?.resolve(); });
   const dir = await mkdtemp(join(tmpdir(), 'dsh-bound-question-'));
   const workspaces = await new BotWorkspaceStore(join(dir, 'workspaces.json'), { defaultWorkspace: dir }).load();
   await workspaces.ensure('im-one');
@@ -55,6 +57,15 @@ async function fixture(t, { failCards = false, failText = false, sendGate } = {}
   };
   const sent = [], patches = [], prompts = [], offers = [], attempts = [];
   let handlers;
+  let askHandler;
+  let bridge;
+  // Capture the real bridge through its public ingress so tests can await its
+  // public idle boundary, including the inbound turn's finally block.
+  const accept = FeishuHarnessBridge.prototype.accept;
+  t.mock.method(FeishuHarnessBridge.prototype, 'accept', function (...args) {
+    bridge = this;
+    return accept.apply(this, args);
+  });
   const sdk = {
     Domain: { Feishu: 'feishu', Lark: 'lark' }, LoggerLevel: { info: 'info' },
     Client: class {
@@ -62,6 +73,7 @@ async function fixture(t, { failCards = false, failText = false, sendGate } = {}
         const send = async (request) => {
           attempts.push(request);
           await sendGate?.promise;
+          if (request.data.msg_type === 'interactive') await cardGate?.promise;
           if (failCards && request.data.msg_type === 'interactive') throw new Error('card unavailable');
           if (failText && request.data.msg_type === 'text') throw new Error('text unavailable');
           sent.push(request);
@@ -81,14 +93,15 @@ async function fixture(t, { failCards = false, failText = false, sendGate } = {}
     },
   };
   const policy = directAccessPolicy({ users: [{ id: 'ou_user' }] });
+  const harness = {
+    async ensureRunning() {}, async sessionExists() { return true; },
+    async ask(...args) { prompts.push(args); await askHandler?.(...args); return 'ordinary answer'; },
+  };
   const runtime = new FeishuRuntime({
     lark: sdk, botId: 'im-one', appId: 'test', appSecret: 'test', ownerOpenIds: ['ou_user'],
     state, accessPolicy: policy, slashCommands: false,
     logger: { warn() {}, error() {}, info() {} },
-    harness: {
-      async ensureRunning() {}, async sessionExists() { return true; },
-      async ask(...args) { prompts.push(args); return 'ordinary answer'; },
-    },
+    harness,
   });
   const config = { id: 'im-one', appId: 'test', secretRef: 'test', ownerOpenIds: ['ou_user'] };
   const controller = new MultiBotDshFeishuController({
@@ -118,7 +131,9 @@ async function fixture(t, { failCards = false, failText = false, sendGate } = {}
   let messageSequence = 0;
   return {
     service, workspaces, state, runtime, key, sent, patches, prompts, offers, frames, policy, attempts,
-    botAnswers,
+    botAnswers, harness,
+    setAskHandler(handler) { askHandler = handler; },
+    async waitForInboundIdle() { await until(() => bridge); await bridge.waitForIdle(); },
     setBotQuestion(question) { botQuestion = question; },
     startBotSync() {
       let onEvent;
@@ -344,7 +359,125 @@ for (const origin of ['desktop', 'automatic', 'restart']) {
   });
 }
 
-for (const reason of ['desktop-answer', 'desktop-dismiss', 'replacement', 'unbind', 'rollover', 'dispose']) {
+for (const presentation of ['before-turn-end', 'during-turn-end']) {
+  for (const reply of ['button', 'text']) {
+    test(`#447: IM-origin DS Bot question accepts ${reply} when presented ${presentation}`, async (t) => {
+      const cardGate = presentation === 'during-turn-end' ? deferred() : undefined;
+      const f = await fixture(t, { cardGate });
+      const sync = f.startBotSync();
+      await sync.ready;
+      let presentationDone;
+      f.setAskHandler(async () => {
+        f.setBotQuestion(questions[0]);
+        presentationDone = sync.refresh();
+        if (cardGate) {
+          await until(() => f.attempts.some((request) => request.data.msg_type === 'interactive'));
+        } else {
+          await presentationDone;
+        }
+      });
+
+      f.text('Ask me before continuing');
+      await f.waitForInboundIdle();
+      assert.equal(f.runtime.status.messagesReplied, 1, 'the IM-origin turn has completed');
+      assert.equal(f.offers.length, 1);
+      if (cardGate) {
+        assert.equal(f.sent.filter((request) => request.data.msg_type === 'interactive').length, 0);
+        cardGate.resolve();
+      }
+      await presentationDone;
+      const cardIndex = f.sent.findIndex((request) => request.data.msg_type === 'interactive');
+      assert.notEqual(cardIndex, -1, 'the question card reaches Feishu');
+      const interaction = f.offers[0][1];
+      if (reply === 'button') f.click(interaction.interactionId, { messageId: `message-${cardIndex + 1}` });
+      else f.text('1');
+      await f.waitForInboundIdle();
+
+      assert.deepEqual(f.botAnswers, [{ sessionId: 'bot-session', questionId: 'choice', answer: answer.answers[0] }]);
+      assert.equal(f.prompts.length, 1, 'the answer must not become another ordinary IM prompt');
+      assert.equal(f.patches.length, 1, 'the answered card is retired');
+      await sync.refresh();
+      assert.equal(f.offers.length, 1, 'an answered question must not be delivered again');
+    });
+  }
+}
+
+for (const presentation of ['complete', 'in-flight']) {
+  test(`#447: stopping a ${presentation} synced question releases its delivery and allows retry`, async (t) => {
+    const cardGate = presentation === 'in-flight' ? deferred() : undefined;
+    const f = await fixture(t, { cardGate });
+    f.harness.workspaceSession = () => ({ async stopActiveTurn() { return true; } });
+    f.policy.getSettings().direct.allowlist.users[0].canExecuteCommands = true;
+    f.setBotQuestion(questions[0]);
+    const sync = f.startBotSync();
+    if (cardGate) await until(() => f.attempts.some((request) => request.data.msg_type === 'interactive'));
+    else await sync.ready;
+    const first = f.offers[0];
+
+    f.text('/stop');
+    await f.waitForInboundIdle();
+    assert.equal(first[2].signal.aborted, true, 'explicit stop releases the Host sync entry');
+    assert.equal(f.botAnswers.length, 0, 'withdrawing an IM delivery does not answer the DS Bot question');
+    cardGate?.resolve();
+    await sync.ready;
+    const beforeStaleClick = f.sent.length;
+    const firstCardIndex = f.sent.findIndex((request) => request.data.msg_type === 'interactive');
+    f.click(first[1].interactionId, { messageId: `message-${firstCardIndex + 1}` });
+    await f.waitForInboundIdle();
+    assert.equal(f.botAnswers.length, 0, 'the withdrawn card cannot submit an answer');
+    assert.ok(f.sent.slice(beforeStaleClick).some((request) => request.data.msg_type === 'text'
+      && JSON.parse(request.data.content).text.includes('这个问题已在其他客户端处理')));
+
+    await sync.refresh();
+    assert.equal(f.offers.length, 2, 'the still-open DS Bot question can be presented again');
+    f.click(f.offers[1][1].interactionId, { messageId: `message-${f.sent.length}` });
+    await f.waitForInboundIdle();
+    assert.deepEqual(f.botAnswers, [{ sessionId: 'bot-session', questionId: 'choice', answer: answer.answers[0] }]);
+    assert.equal(f.prompts.length, 0);
+  });
+}
+
+test('#447: withdrawing a synced question releases both pending routes for retry', async (t) => {
+  const f = await fixture(t);
+  f.setBotQuestion(questions[0]);
+  const sync = f.startBotSync();
+  await sync.ready;
+  const first = f.offers[0];
+  await first[1].withdraw();
+  assert.equal(first[2].signal.aborted, true);
+  assert.equal(f.botAnswers.length, 0);
+  await sync.refresh();
+  assert.equal(f.offers.length, 2);
+  f.click(f.offers[1][1].interactionId, { messageId: 'message-2' });
+  await until(() => f.patches.length === 1);
+  assert.deepEqual(f.botAnswers, [{ sessionId: 'bot-session', questionId: 'choice', answer: answer.answers[0] }]);
+});
+
+for (const outcome of ['complete', 'failed']) {
+  test(`#447: ${outcome} IM turn still cancels its ordinary Harness question`, async (t) => {
+    const f = await fixture(t);
+    const responses = [];
+    f.setAskHandler(async (_sessionId, _text, options) => {
+      await options.onInteraction({
+        kind: 'question', interactionId: 'ordinary-question', rpcId: 'ordinary-question', sessionId: 'bot-session',
+        payload: { sessionId: 'bot-session', questions },
+        async respond(response) { responses.push(response); },
+      });
+      if (outcome === 'failed') throw new Error('Harness turn failed');
+    });
+    f.text('Start an ordinary question');
+    await f.waitForInboundIdle();
+    assert.equal(responses.length, 1);
+    assert.equal(responses[0].ok, false);
+    assert.equal(responses[0].error.code, 'cancelled');
+    f.click('ordinary-question');
+    await f.waitForInboundIdle();
+    assert.equal(responses.length, 1, 'an ordinary question cannot be answered after turn cleanup');
+    assert.equal(f.prompts.length, 1);
+  });
+}
+
+for (const reason of ['desktop-answer', 'desktop-dismiss', 'replacement', 'unbind', 'rollover', 'dispose', 'runtime-stop']) {
   test(`DS Bot ask_user refuses an old Feishu card after ${reason}`, async (t) => {
     const f = await fixture(t);
     f.setBotQuestion(questions[0]);
@@ -355,6 +488,7 @@ for (const reason of ['desktop-answer', 'desktop-dismiss', 'replacement', 'unbin
     if (reason === 'unbind') await f.service.unbindDsBot('im-one', f.key);
     else if (reason === 'rollover') f.rollover();
     else if (reason === 'dispose') sync.close();
+    else if (reason === 'runtime-stop') await f.runtime.stop();
     else f.setBotQuestion(reason === 'replacement' ? { ...questions[0], id: 'next' } : null);
     if (reason === 'desktop-answer') {
       sync.event('user/message');
