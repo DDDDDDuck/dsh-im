@@ -288,8 +288,8 @@ Logo 由 dsh-im 的浏览器适配显示，无需修改 DSH。适配保留原始
 | `/repair` | 在飞书私聊中增量修复卡片回调，并补全媒体、群聊机器人 @ 消息与原生 Slash Command 面板所需的权限。 |
 | `/compact` | 立即压缩当前聊天绑定会话的较早上下文。 |
 | `/clear` | 清空当前聊天绑定会话的模型上下文，同时保留 Session 绑定和历史记录；当前 Host 未注册该命令时会明确提示未支持。 |
-| `/workspace <工作区序号或绝对路径>`、`/ws <工作区序号或绝对路径>` | 按 `/workspacelist` 序号或绝对路径切换当前机器人的 Harness 工作区。 |
-| `/workspacelist`、`/workspaces`、`/wsl` | 列出当前 Harness Host 上仍然存在的工作区绝对路径。 |
+| `/workspace [工作区序号或绝对路径]`、`/ws [...]` | 查看并切换当前机器人的 Harness 工作区：不带参数时列出可切换的工作区（Telegram 上为可点击卡片，点一下即切换，原地标记当前项）；带序号或绝对路径时直接切换。 |
+| `/workspacelist`、`/workspaces`、`/wsl` | `/workspace` 的旧别名，等同无参数形式；原生命令菜单只保留一个工作区入口。 |
 | `/sessionlist [工作区序号或绝对路径]`、`/sessions [...]` | 两个等价命令；列出指定工作区的会话 ID 和标题，默认 IM 目录也包含其中的未分组会话；省略参数时使用当前工作区。 |
 | `/sessionlist --limit N`、`/sessions --limit N` | 列出当前工作区现有顺序中的前 N 个会话；N 必须是正整数。 |
 | `/session <Session ID>` | 将当前聊天绑定到指定的已有 Harness 会话。 |
