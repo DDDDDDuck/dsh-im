@@ -74,7 +74,7 @@ test('the published client registers the complete Russian pack and renders each 
   for (const [id, source] of Object.entries({ zh, en, ru })) {
     assert.deepEqual({ ...dictionaries.get(id) }, source, `published ${id} dictionary is stale`);
   }
-  assert.equal(locale.bind()('绑定bot'), 'Привязать бота');
+  assert.equal(locale.bind()('绑定 DS Bot'), 'Привязать DS Bot');
   assert.equal(locale.bind()('机器人群聊行为'), 'Поведение бота в группах');
   for (const [id, label, loading] of [
     ['ru', 'IM-боты', 'Загружаем настройки боковой панели…'],

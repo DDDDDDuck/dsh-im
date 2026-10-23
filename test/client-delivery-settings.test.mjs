@@ -116,13 +116,13 @@ test('delivery settings define only the ten supported IM channel routes', () => 
   assert.deepEqual(BOT_SETTINGS_TABS, [
     { id: 'general', label: '通用' },
     { id: 'delivery', label: '投递设置' },
-    { id: 'ds-bot', label: '绑定bot' },
+    { id: 'ds-bot', label: '绑定 DS Bot' },
     { id: 'access', label: '访问设置' },
   ]);
   assert.deepEqual(FEISHU_BOT_SETTINGS_TABS, [
     { id: 'general', label: '通用' },
     { id: 'delivery', label: '投递设置' },
-    { id: 'ds-bot', label: '绑定bot' },
+    { id: 'ds-bot', label: '绑定 DS Bot' },
     { id: 'access', label: '访问设置' },
     { id: 'group', label: '群聊' },
     { id: 'slash', label: '指令面板' },
@@ -286,7 +286,7 @@ test('expanded card more settings opens a bot-scoped page and returns in place',
     0,
   );
   const settingsTabs = page.findAllByProps({ role: 'tab' });
-  assert.deepEqual(settingsTabs.map(textOf), ['通用', '投递设置', '绑定bot', '访问设置']);
+  assert.deepEqual(settingsTabs.map(textOf), ['通用', '投递设置', '绑定 DS Bot', '访问设置']);
   const settingsTab = settingsTabs[0];
   const settingsPanel = page.findByProps({ role: 'tabpanel' });
   assert.equal(textOf(settingsTab), '通用');
@@ -397,7 +397,7 @@ test('Feishu more settings has separate group and voice tabs, with only group co
 
   const page = renderer.root.findByProps({ className: 'dim-deliveryPage' });
   assert.deepEqual(page.findAllByProps({ role: 'tab' }).map(textOf), [
-    '通用', '投递设置', '绑定bot', '访问设置', '群聊', '指令面板', '语音交互',
+    '通用', '投递设置', '绑定 DS Bot', '访问设置', '群聊', '指令面板', '语音交互',
   ]);
   await act(async () => {
     button(page, '群聊').props.onClick();
@@ -1093,7 +1093,7 @@ test('recent conversation names remain platform data in the English UI', async (
   );
   assert.deepEqual(
     renderer.root.findAllByProps({ role: 'tab' }).map(textOf),
-    ['General', 'Delivery settings', 'Bind bot', 'Access settings', 'Group', 'Command panel', 'Voice'],
+    ['General', 'Delivery settings', 'Bind DS Bot', 'Access settings', 'Group', 'Command panel', 'Voice'],
   );
 });
 

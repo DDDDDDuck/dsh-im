@@ -68,7 +68,7 @@ const EN = Object.freeze({
   "选择 DS Bot 和私聊对象，直接使用 Bot 的会话。": "Choose a DS Bot and a private chat to use the Bot’s session.",
   "还没有可绑定的私聊。先给这个机器人发一条私聊消息，再点击刷新。": "No private chats yet. Send this bot a private message, then refresh.",
 
-  "绑定bot": "Bind bot",
+  "绑定 DS Bot": "Bind DS Bot",
   "正在检测 DS Bot…": "Checking DS Bot…",
   "选择 DS Bot": "Select DS Bot",
   "暂无可选 DS Bot": "No available DS Bots",
@@ -81,7 +81,7 @@ const EN = Object.freeze({
   "DS Bot 尚未启用，请在 DSH 插件管理中启用后刷新。": "DS Bot is disabled. Enable it in DSH plugin management, then refresh.",
   "暂时无法读取 DS Bot，请检查插件是否正常运行后重试。": "Unable to read DS Bot. Check that the plugin is running, then retry.",
   "DS Bot 当前由其他 Host 管理，请在运行它的 Host 中绑定。": "DS Bot is managed by another Host. Bind it on that Host.",
-  "绑定bot仅支持当前 Host 的会话，请先检查机器人的 Harness 连接设置。": "Bot binding requires the current Host. Check the bot’s Harness connection settings.",
+  "绑定 DS Bot 仅支持当前 Host 的会话，请先检查机器人的 Harness 连接设置。": "DS Bot binding requires the current Host. Check the bot’s Harness connection settings.",
   "所选 DS Bot 已不存在，请刷新后重新选择。": "The selected DS Bot no longer exists. Refresh and select another.",
   "绑定设置保存失败，请刷新后重试。": "Could not save the binding. Refresh and retry.",
   "绑定已保存。": "Binding saved.",

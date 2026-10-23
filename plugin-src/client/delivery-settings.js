@@ -30,7 +30,7 @@ export const DELIVERY_ENDPOINTS = Object.freeze({
 export const BOT_SETTINGS_TABS = Object.freeze([
   Object.freeze({ id: 'general', label: '通用' }),
   Object.freeze({ id: 'delivery', label: '投递设置' }),
-  Object.freeze({ id: 'ds-bot', label: '绑定bot' }),
+  Object.freeze({ id: 'ds-bot', label: '绑定 DS Bot' }),
   Object.freeze({ id: 'access', label: '访问设置' }),
 ]);
 
