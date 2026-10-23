@@ -454,12 +454,56 @@ function telegramFailure(error) {
   };
 }
 
-function deliveryResult(presentation, providerMessageIds, deliveryOutcome = 'sent', reason) {
+function deliveryResult(presentation, providerMessageIds, deliveryOutcome = 'sent', reason, evidence = null) {
   return {
     presentation,
     providerMessageIds: [...new Set(providerMessageIds)],
     deliveryOutcome,
     ...(reason ? { reason } : {}),
+    ...(evidence ? { deliveryEvidence: { ...evidence, deliveryOutcome } } : {}),
+  };
+}
+
+/**
+ * What the send itself observed, kept next to the delivery result.
+ *
+ * The notice a user sees carries a reference id that used to be the only trace
+ * of an unconfirmed delivery. This record travels with the result so the same
+ * id, the attempt history and the text that never got a `message_id` can be
+ * written to the local log in one line.
+ */
+function deliveryEvidence({ target, parseMode, parts, error, reason = null, failedPart = null }) {
+  const attempts = Array.isArray(error?.sendAttempts) ? error.sendAttempts : [];
+  return {
+    chat_id: target?.chatId ?? null,
+    message_thread_id: Number.isInteger(target?.messageThreadId) ? target.messageThreadId : null,
+    // The Bot API request carries no `parse_mode` field: a part is either Rich
+    // Markdown or bare text, and that is what decides which path failed.
+    parse_mode: parseMode,
+    provider_reason: (typeof error?.code === 'string' && error.code) || reason || null,
+    failed_part: Number.isInteger(failedPart) ? failedPart : null,
+    attempts,
+    parts,
+  };
+}
+
+/** One part of an answer, keeping its text only when Telegram never confirmed it. */
+function deliveryPart(index, text, messageId) {
+  return {
+    index,
+    length: typeof text === 'string' ? text.length : 0,
+    message_id: messageId ?? null,
+    ...(messageId ? {} : { text: typeof text === 'string' ? text : '' }),
+  };
+}
+
+/** A plain fallback after a rejected Rich part still belongs to the same answer. */
+function mergeEvidence(primary, fallback) {
+  if (!primary || !fallback) return fallback ?? primary ?? null;
+  return {
+    ...fallback,
+    provider_reason: fallback.provider_reason ?? primary.provider_reason,
+    attempts: [...primary.attempts, ...fallback.attempts],
   };
 }
 
@@ -467,6 +511,7 @@ class TelegramDeliveryStream {
   #update;
   #finish;
   #fail;
+  #onCancel;
   #logger;
   #providerMessageIds;
   #closed = false;
@@ -474,6 +519,7 @@ class TelegramDeliveryStream {
   #lastBlock = null;
   #keepalive = false;
   #previewAnswer = true;
+  #uniqueFrames = false;
   #previewStopped = false;
   #chain = Promise.resolve();
 
@@ -481,15 +527,18 @@ class TelegramDeliveryStream {
     update,
     finish,
     fail,
+    onCancel = null,
     providerMessageIds = [],
     presentation,
     logger,
     keepalive = false,
     previewAnswer = true,
+    uniqueFrames = false,
   }) {
     this.#update = update;
     this.#finish = finish;
     this.#fail = fail;
+    this.#onCancel = onCancel;
     this.#providerMessageIds = providerMessageIds;
     this.presentation = presentation;
     this.#logger = logger;
@@ -501,6 +550,10 @@ class TelegramDeliveryStream {
     // answer text into it would show the same reply twice: first as a run of
     // edits, then again as the delivered message.
     this.#previewAnswer = previewAnswer !== false;
+    // A numbered carrier rewrites one line with a different prefix, so the
+    // identical-text shortcut would swallow every frame after the first and the
+    // reader would still watch a frozen placeholder.
+    this.#uniqueFrames = uniqueFrames === true;
   }
 
   /** Whether answer text may be shown in the carrier before it is delivered. */
@@ -525,6 +578,14 @@ class TelegramDeliveryStream {
     return run;
   }
 
+  /** Queue a write that originates outside update(), such as a paced frame
+   *  released by a timer. It runs on the same chain as finish()/fail(), so a
+   *  slow edit is awaited before finalization instead of landing after the
+   *  answer. */
+  enqueue(task) {
+    return this.#enqueue(task);
+  }
+
   // Live drafts can block the user's composer. Drain any pending draft before
   // the regular question/approval message clears it, and keep this turn's
   // preview stopped so late progress cannot block the answer again.
@@ -539,7 +600,7 @@ class TelegramDeliveryStream {
       const block = createTextDeliveryBlock(value);
       this.#lastBlock = block;
       const key = `${block.format}:${block.text}`;
-      if (key === this.#lastUpdate) return undefined;
+      if (!this.#uniqueFrames && key === this.#lastUpdate) return undefined;
       this.#lastUpdate = key;
       try {
         return await this.#update(block);
@@ -588,6 +649,9 @@ class TelegramDeliveryStream {
 
   cancel() {
     this.#closed = true;
+    // Carrier-specific teardown (a paced progress window still holding a frame
+    // and its timer) lives with whoever opened the stream.
+    this.#onCancel?.();
   }
 }
 
@@ -780,6 +844,7 @@ export class TelegramBotClient {
   async #sendPlain(target, text) {
     const chunks = splitTelegramRegularText(text);
     const providerMessageIds = [];
+    const parts = [];
     for (const [index, chunk] of chunks.entries()) {
       try {
         const result = await this.#api.sendMessage({
@@ -791,13 +856,18 @@ export class TelegramBotClient {
         });
         const id = telegramMessageId(result);
         if (id) providerMessageIds.push(id);
+        parts.push(deliveryPart(index, chunk, id));
       } catch (error) {
+        parts.push(deliveryPart(index, chunk, null));
         const failure = telegramFailure(error);
         return deliveryResult(
           'text-fallback',
           providerMessageIds,
           failure.outcome,
           failure.reason,
+          deliveryEvidence({
+            target, parseMode: 'none', parts, error, failedPart: index,
+          }),
         );
       }
     }
@@ -805,11 +875,19 @@ export class TelegramBotClient {
     // reader may still be staring at nothing, so the final answer claims only
     // what it can prove and lets the caller report the rest.
     if (providerMessageIds.length !== chunks.length) {
+      const unconfirmed = parts.find((part) => !part.message_id) ?? null;
       return deliveryResult(
         'text-fallback',
         providerMessageIds,
         'unknown',
         'telegram-message-id-missing',
+        deliveryEvidence({
+          target,
+          parseMode: 'none',
+          parts,
+          reason: 'telegram-message-id-missing',
+          failedPart: unconfirmed?.index ?? null,
+        }),
       );
     }
     return deliveryResult('text-fallback', providerMessageIds);
@@ -845,6 +923,7 @@ export class TelegramBotClient {
       return this.#sendPlain(target, block.text);
     }
     const providerMessageIds = [];
+    const parts = [];
     for (const [index, chunk] of chunks.entries()) {
       try {
         const result = await this.#api.sendRichMessage({
@@ -856,14 +935,20 @@ export class TelegramBotClient {
         });
         const id = telegramMessageId(result);
         if (id) providerMessageIds.push(id);
+        parts.push(deliveryPart(index, chunk.source ?? chunk.markdown, id));
       } catch (error) {
+        parts.push(deliveryPart(index, chunk.source ?? chunk.markdown, null));
         const failure = telegramFailure(error);
+        const evidence = deliveryEvidence({
+          target, parseMode: 'rich_markdown', parts, error, failedPart: index,
+        });
         if (failure.outcome === 'unknown') {
           return deliveryResult(
             'telegram-rich-final',
             providerMessageIds,
             'unknown',
             failure.reason,
+            evidence,
           );
         }
         const remaining = chunks.slice(index).map((part) => part.source).join('');
@@ -871,22 +956,35 @@ export class TelegramBotClient {
           ...target,
           replyToMessageId: index === 0 ? target.replyToMessageId : undefined,
         }, remaining);
+        // A successful fallback is a delivered answer; only an unconfirmed one
+        // needs the Rich rejection in the log as well.
         return deliveryResult(
           fallback.presentation,
           [...providerMessageIds, ...fallback.providerMessageIds],
           fallback.deliveryOutcome,
           fallback.reason,
+          fallback.deliveryOutcome === 'sent'
+            ? null
+            : mergeEvidence(evidence, fallback.deliveryEvidence),
         );
       }
     }
     // Same proof as the plain path: a rich send that never returned an id
     // cannot be reported as delivered.
     if (providerMessageIds.length !== chunks.length) {
+      const unconfirmed = parts.find((part) => !part.message_id) ?? null;
       return deliveryResult(
         'telegram-rich-final',
         providerMessageIds,
         'unknown',
         'telegram-message-id-missing',
+        deliveryEvidence({
+          target,
+          parseMode: 'rich_markdown',
+          parts,
+          reason: 'telegram-message-id-missing',
+          failedPart: unconfirmed?.index ?? null,
+        }),
       );
     }
     return deliveryResult('telegram-rich-final', providerMessageIds);
@@ -910,42 +1008,120 @@ export class TelegramBotClient {
     if (!Number.isSafeInteger(messageId)) {
       throw new Error('Telegram did not return a placeholder message id');
     }
-    return new TelegramDeliveryStream({
-      update: async (block) => {
-        if (block.format === 'plain') {
-          await this.#api.editMessageText({
-            chatId: target.chatId,
-            messageId,
-            text: block.text,
-            signal: this.#signal,
-          });
-          return deliveryResult('text-fallback', [String(messageId)]);
-        }
+    const editBlock = async (block) => {
+      if (block.format === 'plain') {
         await this.#api.editMessageText({
           chatId: target.chatId,
           messageId,
-          richMessage: { markdown: toTelegramRichMarkdown(block.text) },
+          text: block.text,
           signal: this.#signal,
         });
-        return deliveryResult('telegram-rich-draft', [String(messageId)]);
-      },
+        return deliveryResult('text-fallback', [String(messageId)]);
+      }
+      await this.#api.editMessageText({
+        chatId: target.chatId,
+        messageId,
+        richMessage: { markdown: toTelegramRichMarkdown(block.text) },
+        signal: this.#signal,
+      });
+      return deliveryResult('telegram-rich-draft', [String(messageId)]);
+    };
+    // One message rewritten in place means a row of identical "Using bash"
+    // edits looks frozen. Numbering counts every progress frame of the turn and
+    // prefixes it, so the line keeps moving; pacing keeps the edits themselves
+    // rare and still lands the newest held frame when its window closes.
+    const numbering = this.#thinkingNumbering;
+    const intervalMs = this.#thinkingIntervalMs;
+    let sequence = 0;
+    let held = null;
+    let windowTimer = null;
+    let windowEndsAt = 0;
+    let closed = false;
+    let stream = null;
+    const clearWindowTimer = () => {
+      if (windowTimer === null) return;
+      clearTimeout(windowTimer);
+      windowTimer = null;
+    };
+    const sendHeld = async () => {
+      const frame = held;
+      held = null;
+      if (!frame || closed) return;
+      try {
+        await editBlock(frame);
+      } catch (error) {
+        this.#logger?.warn?.('[dsh-im:telegram] placeholder frame failed:', error);
+      }
+    };
+    const armWindowTimer = () => {
+      if (windowTimer !== null) return;
+      windowTimer = setTimeout(() => {
+        windowTimer = null;
+        windowEndsAt = Date.now() + intervalMs;
+        // The released frame enters the stream's queue instead of editing on its
+        // own: an unqueued edit could still be in flight while finish() deletes
+        // the placeholder and sends the answer, so the stale frame would land
+        // after the reply.
+        void stream.enqueue(() => sendHeld());
+      }, Math.max(0, windowEndsAt - Date.now()));
+    };
+    // Finalization takes whatever the window still holds: the last frame goes
+    // out before the answer, and nothing may start after it.
+    const drainHeld = async () => {
+      clearWindowTimer();
+      await sendHeld();
+      closed = true;
+    };
+    const pushProgress = async (block) => {
+      if (closed) return undefined;
+      sequence += 1;
+      const framed = numbering && block.text
+        ? { ...block, text: `${sequence}. ${block.text}` }
+        : block;
+      if (intervalMs <= 0) return editBlock(framed);
+      if (Date.now() >= windowEndsAt) {
+        // The deadline has passed but its timer may not have run yet, and that
+        // callback would release the frame this newer one supersedes. Drop both
+        // the held frame and its timer before letting the new frame through.
+        clearWindowTimer();
+        windowEndsAt = Date.now() + intervalMs;
+        held = null;
+        return editBlock(framed);
+      }
+      held = framed;
+      armWindowTimer();
+      return undefined;
+    };
+    stream = new TelegramDeliveryStream({
+      update: (block) => pushProgress(block),
       // The placeholder carries progress only: its last frame would be a silent
       // edit, so the answer goes out as its own message and Telegram notifies
       // the reader that the turn is over.
       finish: async (block) => {
+        await drainHeld();
         await this.#deletePlaceholder(target, messageId);
         return this.#sendRich(target, block);
       },
       fail: async (block) => {
+        await drainHeld();
         await this.#deletePlaceholder(target, messageId);
         return this.#sendPlain(target, block.text);
+      },
+      // A cancelled turn must not wake up later and rewrite the placeholder the
+      // reader has already stopped watching.
+      onCancel: () => {
+        closed = true;
+        clearWindowTimer();
+        held = null;
       },
       presentation: 'telegram-regular',
       // Answer text is not mirrored into the placeholder: it is deleted before
       // the real message goes out, so a preview would duplicate the reply.
       previewAnswer: false,
+      uniqueFrames: numbering,
       logger: this.#logger,
     });
+    return stream;
   }
 
   async openStream(target) {
@@ -1147,14 +1323,18 @@ export class TelegramBotClient {
           if (result?.deliveryOutcome === 'unknown') {
             // 结果未知（超时等）：可能已送达，重发会造成重复，保留 unknown 状态。
             remember(result.providerMessageIds);
-            return deliveryResult('telegram-thinking', providerMessageIds, 'unknown', result.reason);
+            return deliveryResult(
+              'telegram-thinking', providerMessageIds, 'unknown', result.reason, result.deliveryEvidence,
+            );
           }
           // 明确失败：该分片确认未送达。纯文本分片再走一次 plain 重发
           // （markdown 分片的 plain 回退已在 #sendRich 内尝试过），只重发
           // 尚未发送的尾部内容，已成功的分片不重复。
           remember(result?.providerMessageIds);
           if (format === 'markdown') {
-            return deliveryResult('telegram-thinking', providerMessageIds, 'failed', result.reason);
+            return deliveryResult(
+              'telegram-thinking', providerMessageIds, 'failed', result.reason, result.deliveryEvidence,
+            );
           }
           warnFailure('final answer chunk', new Error('chunk definitively rejected'));
           try {

@@ -6458,6 +6458,17 @@ test('workspace titles flow through both cards, refreshes, and path-based dropdo
   await send('/workspacelist');
   const list = buttonsFromCard(sent.at(-1).content).filter((button) => callbackAction(button).startsWith('workspace:'));
   assert.deepEqual(list.map((button) => button.text.content), ['1. 交流区（当前）', '2. 策略研究']);
+  // Merged command: the bare /workspace and /ws open the same picker card.
+  for (const alias of ['/ws', '/workspace']) {
+    await send(alias);
+    const aliased = buttonsFromCard(sent.at(-1).content)
+      .filter((button) => callbackAction(button).startsWith('workspace:'));
+    assert.deepEqual(
+      aliased.map((button) => button.text.content),
+      ['1. 交流区（当前）', '2. 策略研究'],
+      alias,
+    );
+  }
   await send('2');
   assert.deepEqual(selected, [paths[1], paths[0]]);
 

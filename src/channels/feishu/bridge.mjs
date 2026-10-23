@@ -145,6 +145,8 @@ const UNWATCH_COMMAND = /^\/unwatch(?:\s+([^\s]+))?$/i;
 const WATCHLIST_COMMAND = /^\/watchlist$/i;
 const SESSION_LIST_PREFIX = /^\/(?:sessionlist|sessions)(?:\s|$)/i;
 const WORKSPACE_LIST_COMMAND = /^\/(?:workspacelist|workspaces|wsl)$/i;
+// After the merge a bare /workspace or /ws opens the same picker card.
+const BARE_WORKSPACE_COMMAND = /^\/(?:workspace|ws)$/i;
 const NUMBER_REPLY = /^\d{1,2}$/;
 /** A displayed menu stays number-tappable for this long. */
 const MENU_TTL_MS = 10 * 60_000;
@@ -1894,7 +1896,7 @@ export class FeishuHarnessBridge {
       );
       return;
     }
-    if (WORKSPACE_LIST_COMMAND.test(commandText)) {
+    if (BARE_WORKSPACE_COMMAND.test(commandText) || WORKSPACE_LIST_COMMAND.test(commandText)) {
       await this.#showWorkspaces({ chatId: event.message.chat_id, key, replyTo: event.message.message_id });
       return;
     }
