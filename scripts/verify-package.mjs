@@ -225,7 +225,7 @@ const directDependencies = {
   '@tencent-connect/qqbot-nodejs': '1.0.4',
   '@wecom/aibot-node-sdk': '1.0.7',
   qrcode: '1.5.4',
-  undici: '7.29.1',
+  undici: '7.30.1',
 };
 for (const [name, version] of Object.entries(directDependencies)) {
   if (manifest.dependencies?.[name] !== version) {

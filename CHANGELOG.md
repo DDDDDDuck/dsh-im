@@ -6,10 +6,37 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-10-24
+
+### Added / 新增
+
+- Telegram 的 `/ws`（`/workspace`）无参数时显示工作区切换卡片，点击按钮即可切换并更新当前项；保留带序号或绝对路径的直接切换，以及 `/wsl`、`/workspaces`、`/workspacelist` 文本别名。过期卡片与重复点击安全处理，工作区列表变更时不会按旧序号误切，卡片不可用时回退文字列表。（[#432](https://github.com/xmanrui/dsh-im/pull/432)）
+  Telegram `/ws` (`/workspace`) without arguments now shows an inline workspace picker. Buttons switch workspaces and update the current selection; direct index/path switching and the `/wsl`, `/workspaces`, and `/workspacelist` aliases remain supported. Stale cards and duplicate clicks are handled safely, changed lists cannot redirect old indices, and unavailable cards fall back to text. ([#432](https://github.com/xmanrui/dsh-im/pull/432))
+- Telegram 投递失败或结果不确定时，将用户提示中的 `MF-…` 编号与发送尝试、分片回执、失败正文写入同一条本地日志，保留富文本回退及过程消息的投递证据，便于定位未送达内容。（[#442](https://github.com/xmanrui/dsh-im/pull/442)）
+  Telegram failed or unconfirmed deliveries now log the user-visible `MF-…` reference alongside send attempts, part acknowledgments, and undelivered text, retaining rich-text fallback and thinking-stream evidence for diagnosis. ([#442](https://github.com/xmanrui/dsh-im/pull/442))
+
 ### Fixed / 修复
 
+- 确认普通绑定会话的日志损坏且消息尚未提交时，自动切换到新会话并提示后继续本条消息，最多恢复一次；保留原会话，不自动迁移历史上下文，不将归档、权限、临时故障或提交状态不确定的情况误判为损坏，也不替换 DS Bot 会话。（[#445](https://github.com/xmanrui/dsh-im/pull/445)）
+  Confirmed corrupt logs in ordinary bound sessions can recover once into a new session before prompt submission, with a notice before continuing. Original sessions remain intact and history is not migrated. Archived, inaccessible, transient, uncertain-submission, and DS Bot session failures do not trigger this replacement. ([#445](https://github.com/xmanrui/dsh-im/pull/445))
+- 修复运行时拼接文案仅显示英文或翻译不完整的问题，完善渠道状态、凭据绑定及管理设置中的动态英文、俄语翻译，并补充回归覆盖。（[#443](https://github.com/xmanrui/dsh-im/pull/443)）
+  Fixed incomplete or English-only runtime-composed messages, improving dynamic English and Russian localization across channel status, credential binding, and management settings with regression coverage. ([#443](https://github.com/xmanrui/dsh-im/pull/443))
+- 管理界面统一使用“绑定 DS Bot”等明确标签，避免与 IM 渠道机器人混淆。
+  Clarified DS Bot binding labels in management settings to distinguish DS Bot from IM channel bots.
 - 修复飞书私聊发起 DS Bot 提问后，回合收尾误取消新问题卡、点击提示“已在其他客户端处理”的问题；同步问题按自身生命周期结束，撤回时同步释放投递状态，保留普通 Harness 问答及发送失败时的取消清理。（[#447](https://github.com/xmanrui/dsh-im/issues/447)）
   Fixed Feishu-initiated DS Bot questions being cancelled by turn cleanup immediately after delivery. Synced questions now retain their own lifetime and release upstream delivery state on withdrawal, while ordinary Harness questions and failed-delivery cancellation retain their existing cleanup. ([#447](https://github.com/xmanrui/dsh-im/issues/447))
+
+### Security / 安全
+
+- Undici 更新到 7.30.1，Nodemailer 最低版本提高至 10.1.4，Mailparser 最低版本提高至 3.9.43，纳入上游 HTTP 响应处理及邮件地址解析安全修复。（[Undici 公告](https://github.com/advisories/GHSA-xjj6-f33q-929c)、[Nodemailer 公告](https://github.com/advisories/GHSA-8c8m-p3m8-cjg8)）
+  Updated Undici to 7.30.1 and raised minimum versions to Nodemailer 10.1.4 and Mailparser 3.9.43, incorporating upstream HTTP response handling and email address parsing security fixes. ([Undici advisory](https://github.com/advisories/GHSA-xjj6-f33q-929c), [Nodemailer advisory](https://github.com/advisories/GHSA-8c8m-p3m8-cjg8))
+
+### Notes / 使用说明
+
+- Telegram 失败投递日志可能包含未送达的消息正文、聊天和话题标识；分享日志前请检查并脱敏。日志中的平台错误说明会过滤匹配的 Bot Token URL，但消息正文按原样记录。
+  Telegram delivery-failure logs can contain undelivered message text and chat/topic identifiers. Review and redact logs before sharing. Matching bot-token URLs are scrubbed from provider error descriptions, while message text is retained verbatim.
+- Node.js 要求及 DSH 兼容声明保持不变。升级后重启 Host 并刷新管理页面。感谢 [@wings1848](https://github.com/wings1848) 的工作区卡片贡献和 [@unera](https://github.com/unera) 的翻译及投递诊断改进。
+  Node.js requirements and DSH compatibility declarations are unchanged. Restart the Host and refresh management pages after upgrading. Thanks to [@wings1848](https://github.com/wings1848) for workspace cards and [@unera](https://github.com/unera) for localization and delivery diagnostics.
 
 ## [5.5.0] - 2026-10-24
 
@@ -2013,7 +2040,13 @@ Thanks to [@Dong09](https://github.com/Dong09) for the Matrix conversation-conte
 - 改进 npm 发布包结构，保留 CLI 入口并避免安装脚本拦截。
   Improved npm package contents to preserve the CLI entry point and avoid install-script blocking.
 
-[Unreleased]: https://github.com/xmanrui/dsh-im/compare/v5.0.3...HEAD
+[Unreleased]: https://github.com/xmanrui/dsh-im/compare/v5.6.0...HEAD
+[5.6.0]: https://github.com/xmanrui/dsh-im/compare/v5.5.0...v5.6.0
+[5.5.0]: https://github.com/xmanrui/dsh-im/compare/v5.4.0...v5.5.0
+[5.4.0]: https://github.com/xmanrui/dsh-im/compare/v5.3.0...v5.4.0
+[5.3.0]: https://github.com/xmanrui/dsh-im/compare/v5.2.0...v5.3.0
+[5.2.0]: https://github.com/xmanrui/dsh-im/compare/v5.1.0...v5.2.0
+[5.1.0]: https://github.com/xmanrui/dsh-im/compare/v5.0.3...v5.1.0
 [5.0.3]: https://github.com/xmanrui/dsh-im/compare/v5.0.2...v5.0.3
 [5.0.2]: https://github.com/xmanrui/dsh-im/compare/v5.0.1...v5.0.2
 [5.0.1]: https://github.com/xmanrui/dsh-im/compare/v5.0.0...v5.0.1
