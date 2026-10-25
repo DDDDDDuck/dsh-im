@@ -53,7 +53,7 @@
       <a href="https://88api.ai/sign-up?aff=lJoL"><img src="assets/sponsors/88api.jpg" alt="88API Token聚合平台" width="150"></a>
     </td>
     <td valign="middle">
-      <a href="https://88api.ai/sign-up?aff=lJoL"><strong>88API Token聚合平台</strong></a>赞助了本项目！88API 是一家由香港企业运营并且主要面向开发者、创作者与 AI 应用用户的一站式多模型 API 平台，通过统一接口接入文本、图片、语音和视频模型，覆盖 AI 编程、智能翻译、内容创作、配音、图像生成、视频生成等常见工作流。可提供高质量的折扣Deepseek官转算力和自由B300集群自部署Deepseek算力；支持国际主流付款方式，可提供发票，提供企业级稳定服务。<a href="https://88api.ai/sign-up?aff=lJoL"><strong>通过此链接注册可以获取专属赠送额度！</strong></a>
+      <a href="https://88api.ai/sign-up?aff=lJoL"><strong>88API Token聚合平台</strong></a>赞助了本项目！88API 是一家由香港企业运营并且主要面向开发者、创作者与 AI 应用用户的一站式多模型 API 平台，通过统一接口接入文本、图片、语音和视频模型，覆盖 AI 编程、智能翻译、内容创作、配音、图像生成、视频生成等常见工作流。可提供高质量的折扣Deepseek官转算力和自有B300集群自部署Deepseek算力；支持国际主流付款方式，可提供发票，提供企业级稳定服务。<a href="https://88api.ai/sign-up?aff=lJoL"><strong>通过此链接注册可以获取专属赠送额度！</strong></a>
     </td>
   </tr>
   <tr>
