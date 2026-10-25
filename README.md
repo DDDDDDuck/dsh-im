@@ -62,7 +62,7 @@
       <a href="https://github.com/deepseek-ai/deepseek-harness"><strong>DeepSeek<br>Harness</strong></a>
     </td>
     <td valign="middle">
-      <strong>DSH-IM 已获得 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> 官方 Token 赞助，价值人民币 2,000 元</strong>。感谢官方对本项目的支持！
+      <strong>DSH-IM 已获得 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> 官方 Token 赞助</strong>。感谢官方对本项目的支持！
       <p>本项目由社区开发者独立开发与维护。</p>
     </td>
   </tr>

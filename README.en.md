@@ -61,7 +61,7 @@
       <a href="https://github.com/deepseek-ai/deepseek-harness"><strong>DeepSeek<br>Harness</strong></a>
     </td>
     <td valign="middle">
-      <strong>DSH-IM has received official sponsorship from <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> in the form of RMB 2,000 in token credits</strong>. Thank you to the DeepSeek Harness team for supporting this project!
+      <strong>DSH-IM has received official sponsorship from <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a> in the form of token credits</strong>. Thank you to the DeepSeek Harness team for supporting this project!
       <p>This project is independently developed and maintained by community developers.</p>
     </td>
   </tr>
