@@ -6,6 +6,11 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- 企业微信机器人在服务端主动断开后（例如同一凭据在别处建立了新连接：SDK 将该断开视为手动关闭，既不重连也不再发出任何事件）会永久停留在「正在连接」。健康检查循环虽持续调用 `initialize()`，但「正在连接」的运行时总被跳过，机器人只能靠手动重连恢复。现在 `initialize()` 将最近一次状态切换超过宽限期（默认 2 分钟，覆盖 SDK 一整轮重连周期）的「正在连接」视为停滞并自动重启连接；反复被踢的短命连接（存活不足 5 分钟即再次掉线）按 1 分钟起步、最长 10 分钟按 bot 指数退避限速，连接持续稳定 5 分钟后退避清零；连接启动失败沿用同一退避。正常重连过程中的「正在连接」不受影响，手动重连始终立即执行。
+  Enterprise WeChat bots stayed in "connecting" forever after a server-side disconnect (for example when a new connection using the same credential made the server drop this one: the SDK treats that close as manual and neither reconnects nor emits further events). The supervisor-driven health loop kept calling `initialize()`, which always skips a "connecting" runtime, so only a manual reconnect could recover the bot. `initialize()` now treats a "connecting" runtime whose last transition is older than a grace window (2 minutes by default, covering one full SDK retry cycle) as stalled and restarts it automatically. Repeatedly kicked short-lived connections (dropping again within 5 minutes) are rate-limited per bot with exponential backoff from 1 minute up to 10 minutes; the backoff clears after a connection stays healthy for 5 minutes, and connection start failures share the same backoff. Actively reconnecting runtimes are untouched, and a manual reconnect always runs immediately.
+
 ## [5.6.0] - 2026-10-24
 
 ### Added / 新增
