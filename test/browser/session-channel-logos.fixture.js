@@ -124,11 +124,13 @@ async function run() {
     assert(Number.parseFloat(visual.width) >= visibleWidth - 1,
       `scrolling replacement still clips the title at ${left}: ${visual.width} < ${visibleWidth}`);
     assert(visual.textOverflow !== 'ellipsis', 'scrolling replacement still draws an ellipsis');
-    assert(scrolling.scrollLeft === Math.round(left), 'Host scroll position was overridden');
+    // scrollWidth/clientWidth are integers, but scrollLeft may clamp at a
+    // fractional CSS pixel on high-DPI displays. Allow only rounding error.
+    assert(Math.abs(scrolling.scrollLeft - left) <= 1, 'Host scroll position was overridden');
     assert(scrolling.firstChild === scrollingNode, 'scrolling replaced the React text node');
     if (left === range) {
       const tail = Number.parseFloat(visual.left) + Number.parseFloat(visual.width) - scrolling.scrollLeft;
-      assert(tail > 0 && tail <= scrolling.clientWidth, 'the final title characters are outside the viewport');
+      assert(tail > 0 && tail <= scrolling.clientWidth + 1, 'the final title characters are outside the viewport');
     }
   }
   scrolling.scrollTo({ left: 0, behavior: 'instant' });
