@@ -6,6 +6,11 @@ This file records the notable changes in each dsh-im release. Its format follows
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- Slack 流式定稿在追加失败或最终文本被重写时，改用 `chat.update` 的 `markdown_text`，不再以 `parse: none` 发送原始 GFM。Markdown block 被拒绝时先重试 `markdown_text`；只有 Markdown 本身被拒绝时才按字面文本发送，避免把 `**` 和表格当成 mrkdwn。（[#466](https://github.com/xmanrui/dsh-im/issues/466)）
+  Slack stream finalization now updates with `markdown_text` when appending fails or the final text is rewritten, instead of sending raw GFM with `parse: none`. A rejected Markdown block retries `markdown_text`; literal text is used only when the Markdown itself is rejected, so `**` and tables are not parsed as mrkdwn. ([#466](https://github.com/xmanrui/dsh-im/issues/466))
+
 ## [5.6.0] - 2026-10-24
 
 ### Added / 新增
